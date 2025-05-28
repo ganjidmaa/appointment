@@ -122,8 +122,7 @@ class IncomeReportByDaysExport implements FromArray, WithHeadings, WithCustomSta
             $data['total_discount'] = $invoice->total_discount ? $invoice->total_discount : 0;
             $data['total_paid'] = $invoice->total_paid ? $invoice->total_paid : 0;
             foreach($this->payment_methods as $payment_method) {
-                // $method_amount = $invoice['total_'.$payment_method->slug.'_amount'];
-                $method_amount = $invoice->{'total_'.$payment_method->slug.'_amount'};
+                $method_amount = $invoice['total_'.$payment_method->slug.'_amount'];
                 $data['total_'.$payment_method->slug] = $method_amount ? $method_amount : 0;
             }
             $total_left = ($invoice->total_payment - $invoice->total_discount - $invoice->total_paid);

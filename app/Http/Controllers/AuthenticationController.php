@@ -8,8 +8,7 @@ use App\Mail\PasswordReset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
-use Illuminate\Support\Facades\Log;
-use Mail;
+use Illuminate\Support\Facades\Mail;
 
 class AuthenticationController extends Controller
 {

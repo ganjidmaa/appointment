@@ -46,7 +46,7 @@
         <img height="80px" src="{{ storage_path('app/public/' . $settings->logo) }}" />
     </div>
     <div style="margin-left: 36%;">
-        <h4 style="margin:10px; padding:0%;">Нүдний эмчийн үзлэг</h4>
+        <h4 style="margin:0%; padding:0%;">Нүдний эмчийн үзлэг</h4>
     </div>
     <table class="tg" style="table-layout: fixed; width: 700px">
         <colgroup>
@@ -79,13 +79,13 @@
             <tr>
                 <td class="tg-0lax" colspan="12"><span style="font-weight:bold">Овог нэр: </span>
                     {{ $customer->lastname }}-ийн {{ $customer->firstname }}</td>
-                <td class="tg-0lax" colspan="6"><span style="font-weight:bold">Нас:</span> {{ $age }} <span style="font-weight:bold">Хүйс:</span>@if($customer->gender == 0) Эрэгтэй @else Эмэгтэй @endif</td>
+                <td class="tg-0lax" colspan="6"><span style="font-weight:bold">Нас:</span> {{ $age }}</td>
                 <td class="tg-0lax" colspan="6"><span style="font-weight:bold">РД:</span> {{ $customer->registerno }}
                 </td>
             </tr>
 
             <tr>
-                <td class="tg-0lax" colspan="12"><span style="font-weight:bold">Хаяг:</span>{{$customer->address ? optional($customer->address)->province->name : ''}}, {{$customer->address ? optional($customer->address)->soumDistrict->name : ''}}, {{ optional($customer->address)->street }}, {{ optional($customer->address)->street1 }}</td>
+                <td class="tg-0lax" colspan="12"><span style="font-weight:bold">Хаяг:</span></td>
                 <td class="tg-0lax" colspan="6"><span style="font-weight:bold">Утас:</span> {{ $customer->phone }},
                     {{ $customer->phone2 }}</td>
                 <td class="tg-0lax" colspan="6"><span style="font-weight:bold">Огноо:</span>
@@ -291,7 +291,9 @@
             </tr>
             <tr>
                 <td class="tg-0lax" colspan="24"><span style="font-weight:bold">ОНОШ: </span>
-                    {{ $appointment->diagnosis }}
+                    @foreach ($events as $event)
+                    {{ optional($event->service)->name }}, 
+                    @endforeach</td>
             </tr>
             <tr>
                 <td class="tg-0lax" colspan="24"><span style="font-weight:bold">ЭМЧИЛГЭЭ: </span>
@@ -344,11 +346,7 @@
             </tr>
         </tbody>
     </table>
-    <div style="margin-top:20px; font-size: 15px; text-align: right;">
-        <span style="margin-top: 5px;">Эмчийн гарын үсэг:..........................................\.................................\</span><br>
-        <span style="margin-top: 5px;">{{$settings->address}}</span><br>
-        <span style="margin-top: 5px;">Утас: {{$settings->phone}}</span>
-    </div>
+    <span></span>
 </body>
 
 </html>

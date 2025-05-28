@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AppointmentsController;
 use App\Http\Controllers\QpayController;
+use App\Http\Controllers\ShiftController;
 use Illuminate\Http\Request;
 use Illuminate\Routing\RouteRegistrar;
 use Illuminate\Support\Facades\Route;
@@ -13,7 +14,7 @@ use App\Http\Controllers\DiscountsController;
 use App\Http\Controllers\MembershipsController;
 use App\Http\Controllers\MembershipTypesController;
 use App\Http\Controllers\UsersController;
-use App\Http\Controllers\ProvincesController;
+use App\Http\Controllers\MobileOtpController;
 use App\Http\Controllers\ResourcesController;
 use App\Http\Controllers\ServiceCategoriesController;
 use App\Http\Controllers\ServicesController;
@@ -117,7 +118,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::put('update_payment_methods', [AppointmentsController::class, 'updatePaymentMethods']);
     });
     Route::get('health_condition/{id}', [AppointmentsController::class, 'getHealthCondition']);
-    Route::post('health_condition/print/{id}', [AppointmentsController::class, 'printHealthCondition']);
+    Route::get('health_condition/print/{id}', [AppointmentsController::class, 'printHealthCondition']);
     Route::post('health_condition', [AppointmentsController::class, 'updateHealthCondition']);
 
     Route::get('discounts/query', [DiscountsController::class, 'index']);
@@ -182,6 +183,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('bank_account/{id}', [BankAccountsController::class, 'update']);
     Route::delete('bank_account/{id}', [BankAccountsController::class, 'destroy']);
 
+    Route::get('shift/index', [ShiftController::class, 'index']);
+    Route::put('shift/store_data', [ShiftController::class, 'store']);
+    Route::put('shift/store_time_off', [ShiftController::class, 'storeTimeOff']);
+
 });
 
 Route::prefix('qpay')->group(function () {
@@ -213,6 +218,10 @@ Route::put('branch', [BranchesController::class, 'store']);
 Route::get('branch/{id}', [BranchesController::class, 'show']);
 Route::post('branch/{id}', [BranchesController::class, 'update']);
 Route::delete('branch/{id}', [BranchesController::class, 'destroy']);
+
+Route::post('mobile/get_code', [MobileOtpController::class, 'sendConfirmCode']);
+Route::post('mobile/confirm_code', [MobileOtpController::class, 'confirm']);
+Route::post('mobile/cancel_event', [MobileOtpController::class, 'cancelEvent']);
 
 Route::post('/send_email', [ApiController::class, 'postFromSite']);
 Route::post('/test_check', [QpayController::class, 'testCheck']);

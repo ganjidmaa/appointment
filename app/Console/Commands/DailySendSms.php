@@ -40,14 +40,13 @@ class DailySendSms extends Command
         if($settings->sms_count < $settings->sms_limit) {
             $daily_sms_temp = $settings->daily_sms_reminder_txt;
             $daily_sms_remind_minutes = $settings->daily_sms_reminder_minutes;
-            //events.start_time нь УБ timezone -р бичигдэж байгаа. 
+            //events.start_time нь УБ timezone -р бичигдэж байгаа.
             //Харин серверийн цаг нь UTC учраас +8hours remind_minute дээр нэмж зөрүүг арилгана.
             $daily_sms_remind_minutes = $daily_sms_remind_minutes + (60*8);
 
             if($daily_sms_remind_minutes == 0)
                 return '';
 
-            // $today = date("Y-m-d H:i:s", strtotime('+8 hours'));
             $today = date('Y-m-d H:i:00');
 
             $appointments = DB::table('appointments')
@@ -65,29 +64,29 @@ class DailySendSms extends Command
                 if($settings->sms_count >= $settings->sms_limit) {
                     Log::info('Sms limit finished !!!');
                     break;
-                }    
+                }
 
                 $customer = Customer::find($appointment->customer_id);
 
-                $customer_name = converCyrToLat($customer->firstname);
-                $user = User::find($appointment->user_id);
-                $doctor = $this->converCyrToLat($user->firstname);
+                $customer_name = $this->converCyrToLat($customer->firstname);
+                //$user = User::find($appointment->user_id);
+                //$doctor = $this->converCyrToLat($user->firstname);
                 $hospital = $this->converCyrToLat($settings->company_name);
-                
+
                 $app_date = date('m/d', strtotime($appointment->appointment_start_time));
                 $app_time = date('H:i', strtotime($appointment->appointment_start_time));
                 // $app_date = Carbon::parse($appointment->to_date)->format('Y-m-d');
                 // $app_time = Carbon::parse($appointment->to_date)->format('H:i:s');
-                
+
                 $msg = str_replace('$customer', $customer_name, $daily_sms_temp);
-                $msg = str_replace('$doctor', $doctor, $msg);
+                //$msg = str_replace('$doctor', $doctor, $msg);
                 $msg = str_replace('$hospital', $hospital, $msg);
                 $msg = str_replace('$date', $app_date, $msg);
                 $msg = str_replace('$time', $app_time, $msg);
                 $msg = str_replace('$tel', $settings->phone, $msg);
                 $msg = str_replace('$branch', $appointment->branch_name, $msg);
 
-                
+
                 $message = new SmsHistory();
                 $message->tel = $customer->phone;
                 $message->appointment_id = $appointment->id;

@@ -62,6 +62,14 @@ class AttendanceReportByUsersExport implements FromArray, WithHeadings, WithCust
         $start_date = date('Y-m-d 00:00:00', strtotime($this->date_interval[0]));
         $end_date = date('Y-m-d 23:59:59', strtotime($this->date_interval[1]));
 
+        $statusTable = [
+            'mistake' => 'Санамсаргүй үүсгэсэн',
+            'user_request' => 'Үйлчлүүлэгч холбогдож цуцалсан',
+            'user_accept' => 'Үйлчилгээгээ авсан',
+            'user_decline' => 'Үйлчлүүлэгч өдрөө өөрчилсөн',
+            'user_self_online' => 'Үйлчлүүлэгч онлайнаар цуцалсан',
+        ];
+
         $appointment_statuses = DB::select(DB::raw("SELECT COUNT(no_show_events.id) as no_showed_number, 
             COUNT(cancelled_events_1.id) as cancelled_events_1_number, COUNT(cancelled_events_2.id) as cancelled_events_2_number, 
             COUNT(booked_events.id) as booked_number, COUNT(show_events.id) as showed_number, users.firstname FROM events
@@ -96,6 +104,10 @@ class AttendanceReportByUsersExport implements FromArray, WithHeadings, WithCust
             $data['no_showed'] = $appointment->no_showed_number;
             $data['cancelled_one'] = $appointment->cancelled_events_1_number;
             $data['cancelled_two'] = $appointment->cancelled_events_2_number;
+            $data['cancelled_thr'] = $appointment->cancelled_events_3_number;
+            $data['cancelled_four'] = $appointment->cancelled_events_4_number;
+            $data['cancelled_five'] = $appointment->cancelled_events_5_number;
+
 
             $datas[] = $data;
         }

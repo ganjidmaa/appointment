@@ -60,33 +60,30 @@ class MonthlySendSms extends Command
                     if($settings->sms_count >= $settings->sms_limit) {
                         Log::info('Sms limit finished !!!');
                         break;
-                    }    
+                    }
 
                     $customer = Customer::find($appointment->customer_id);
 
-                    $customer_name = converCyrToLat($customer->firstname);
-                    $user = User::find($appointment->user_id);
-                    $doctor = $this->converCyrToLat($user->firstname);
+                    $customer_name = $this->converCyrToLat($customer->firstname);
+                    //$user = User::find($appointment->user_id);
+                    //$doctor = $this->converCyrToLat($user->firstname);
                     $hospital = $this->converCyrToLat($settings->company_name);
-                    
+
                     $app_date = date('m/d', strtotime($appointment->appointment_start_time));
                     $app_time = date('H:i', strtotime($appointment->appointment_start_time));
-                    // $app_date = Carbon::parse($appointment->to_date)->format('Y-m-d');
-                    // $app_time = Carbon::parse($appointment->to_date)->format('H:i:s');
-                    
-                    $msg = str_replace('$customer', $customer_name, $monthly_sms_remind_txt);
-                    $msg = str_replace('$doctor', $doctor, $msg);
+
+                    $msg = str_replace('$customer', $customer_name, $daily_sms_temp);
+                    //$msg = str_replace('$doctor', $doctor, $msg);
                     $msg = str_replace('$hospital', $hospital, $msg);
                     $msg = str_replace('$date', $app_date, $msg);
                     $msg = str_replace('$time', $app_time, $msg);
                     $msg = str_replace('$tel', $settings->telno, $msg);
                     $msg = str_replace('$branch', $appointment->branch_name, $msg);
 
-                    
                     $message = new SmsHistory();
                     $message->tel = $customer->phone;
                     $message->appointment_id = $appointment->id;
-                    $message->type = 1;
+                    $message->type = 0;
                     $message->msg = $msg;
                     $message->save();
 
@@ -100,6 +97,7 @@ class MonthlySendSms extends Command
                         $settings->save();
                     }
                 }
+                
             }   
         }
         return Command::SUCCESS;

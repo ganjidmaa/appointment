@@ -2,22 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Appointment;
 use App\Models\Address;
 use App\Models\Customer;
 use App\Models\Province;
 use App\Models\SoumDistrict;
-use App\Models\Payment;
 use App\Models\Invoice;
 use App\Models\Image;
 use App\Models\Membership;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\DB;
 
  // Link image type to correct image loader and saver
 // - makes it easier to add additional types later on
@@ -195,12 +189,6 @@ class CustomersController extends Controller
         ]);
     }
 
-    public function symbolLabel()
-    {
-        $colors = ['warning', 'primary', 'success', 'danger', 'info', 'dark'];
-        $index = mt_rand(0, count($colors) - 1);
-        return $colors[$index];
-    }
 
     public function getCustomerFormat($customer_arr, $customer)
     {
@@ -213,8 +201,9 @@ class CustomersController extends Controller
                 'path' => $customer->avatar,
                 'preview' => $path . '' . $customer->avatar,
             ];
-        } else {
-            $state = $this->symbolLabel();
+        }
+        else {
+            $state = symbolLabel();
             $label = mb_substr($customer->firstname, 0, 1);
 
             $initials['label'] = mb_strtoupper($label);
@@ -425,7 +414,6 @@ class CustomersController extends Controller
             $appointment_data['status'] = $appointment->status;
             $appointment_data['cancellation_type'] = $appointment->cancellation_type;
             $appointment_data['desc'] = $appointment->desc;
-            $appointment_data['diagnosis'] = $appointment->diagnosis;
             $appointment_data['conclusion'] = $appointment->conclusion;
 
             $events = $appointment->eventsWithTrashed;
@@ -440,7 +428,6 @@ class CustomersController extends Controller
                 $event_data['end_time'] = $event->end_time;
                 $event_data['duration'] = $event->duration;
                 $event_data['resource_name'] = $event->resource?->name;
-                $event_data['treatment'] = $event->treatment;
 
                 $event_datas[] = $event_data;
             }

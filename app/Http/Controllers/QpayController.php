@@ -32,7 +32,7 @@ class QpayController extends Controller
 
         $signature = hash_hmac($digest, $string_to_sign, $secret);
 
-        $auth = env('PUSHER_APP_KEY').":$signature";
+        $auth = "app-key:$signature";
         // Return the authentication response
         return response()->json([
             'auth' => $auth,

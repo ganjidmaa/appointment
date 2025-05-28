@@ -13,10 +13,12 @@ use App\Models\Settings;
 use App\Models\ServiceBranch;
 use App\Models\ServiceUser;
 use App\Models\OnlineBookingSettings;
+use App\Models\Shift;
 use App\Models\Comment;
 use App\Models\Coupon;
 use App\Models\CouponCode;
 use Illuminate\Support\Facades\Storage;
+use Carbon\CarbonPeriod;
 use App\Models\MembershipType;
 use DateInterval;
 use DateTime;
@@ -69,24 +71,14 @@ class OnlineBookingController extends Controller
         // online booking settings array making
         $booking_settings = OnlineBookingSettings::find(1);
         $settings_arr = $booking_settings->attributesToArray();
-        $path = env("APP_URL") . '/'.env("APP_PUBLIC_STORAGE");
-        $image_names = json_decode($booking_settings->image);
-        $image = [];
-        if($image_names) {
-            foreach ($image_names as $key => $image_name) {
-                $image[] = $path . '/' . $image_name;
-            }
-        }
-        else {
-            $image[] = $path . '/' . $booking_settings->image;
-        }
 
+        $path = env("APP_URL") . '/'.env("APP_PUBLIC_STORAGE");
         $formatted_data = [
             ...$settings_arr,
             'choose_qpay' => $booking_settings->choose_qpay == 1 ? true : false,
             'choose_autoDiscard' =>$booking_settings->choose_autoDiscard == 1 ? true : false,
             'choose_user' => $booking_settings->choose_user == 1 ? true : false,
-            'image_url' => $booking_settings->image ? $image : '',
+            'image_url' => $booking_settings->image ? $path . '/' . $booking_settings->image : '',
         ];
         //if type and branch present same time
         if ($settings->has_service_type == 1 || $settings->has_branch == 1){
@@ -239,20 +231,24 @@ class OnlineBookingController extends Controller
     public function getAvailableHours(Request $request, $getData = false)
     {
         //doing setup based on branch
-        if (isset($request->branch_id)) {
-            $branch_id = $request->branch_id;
-            $branch = Branch::find($branch_id);
-            $start_time = Carbon::createFromFormat('H:i:s', $branch->start_time . ':00');
-            $end_time = Carbon::createFromFormat('H:i:s', $branch->end_time . ':00');
-            $slot_minut = $branch->slot_duration;
-            $whereRaw = 'branch_id LIKE  "%'.$branch_id.'%"';
-        } else {
-            $settings = Settings::find(1);
-            $start_time = Carbon::createFromFormat('H:i:s', $settings->start_time . ':00');
-            $end_time = Carbon::createFromFormat('H:i:s', $settings->end_time . ':00');
-            $slot_minut = $settings->slot_duration;
-            $whereRaw = '1';
-        }
+
+        $online_settings = OnlineBookingSettings::find(1);
+
+        $settings = Settings::find(1);
+        $branch = $request->branch_id ? Branch::find($request->branch_id) : '';
+        $work_start_time = $branch && $branch->start_time ? $branch->start_time : $settings->start_time;
+        $work_end_time = $branch && $branch->end_time ? $branch->end_time : $settings->end_time;   
+        $business_days = $branch && $branch->business_days ? $branch->business_days : $settings->business_days;
+        $slot_minut = $branch && $branch->slot_duration ? $branch->slot_duration : $settings->slot_duration;
+        $whereRaw = $request->branch_id ? 'branch_id LIKE  "%'.$request->branch_id.'%"' : '1';
+
+        $start_time = Carbon::createFromFormat('H:i:s', $work_start_time . ':00');
+        $end_time = Carbon::createFromFormat('H:i:s', $work_end_time . ':00');
+
+        $lunch_start_time = $branch && $branch->lunch_start_time ? $branch->lunch_start_time : $settings->lunch_start_time;
+        $lunch_end_time = $branch && $branch->lunch_end_time ? $branch->lunch_end_time : $settings->lunch_end_time;
+        
+
         //setting up event happen day
         $event_date = date('Y-m-d', strtotime($request->event_date));
         $start_date = Carbon::createFromFormat('Y-m-d H:i:s', $event_date . ' 00:00:01');
@@ -329,6 +325,38 @@ class OnlineBookingController extends Controller
                     ->where('events.user_id', $ongoing_user->id)
                     ->get()->toArray();
                     $booked_hours_by_user = json_decode(json_encode($booked_hours_by_user), true);
+
+                    //------------------start of shift times------------------
+                        //make lunch time to event
+                    if($lunch_start_time && $lunch_end_time){
+                        $booked_hours_by_user[] = [
+                            'start_time' => $lunch_start_time,
+                            'end_time' => $lunch_end_time
+                        ];
+                    }
+
+                    $shifts = Shift::whereRaw(sql: 'start_date <= "'.$start_date->format('Y-m-d').'" and 
+                        end_date >= "'.$start_date->format('Y-m-d').'" and
+                        user_id = "'.$user->id.'"')->get();
+
+                    $day_name = strtolower(string: Carbon::parse($event_date)->format('l'));
+                    foreach ($shifts as $shift) {
+                        $shift_week_data = json_decode($shift->shift_data);
+                        foreach ($shift_week_data as $key => $shift_week) {
+                            if($key == $day_name) {
+                                if($shift_week->enabled == true) {
+                                    //make custom working time to event
+                                    $booked_hours_by_user[] = ['start_time' => '00:00', 'end_time' => $shift_week->start];
+                                    $booked_hours_by_user[] = ['start_time' => $shift_week->end, 'end_time' => '23:59'];
+                                } else {
+                                    $booked_hours_by_user[] = ['start_time' => '00:00', 'end_time' => '23:59'];
+                                }
+                            }
+                            
+                        }
+                    }
+                    //------------------end of shift times------------------
+
                     if($this->checkIsTimeAvailable($possible_hour, $service->duration, $booked_hours_by_user)){
                         $free_time['possible_users'][] = $ongoing_user->id; 
                     }
@@ -339,8 +367,8 @@ class OnlineBookingController extends Controller
                     $possible_set_of_hours = [];
                     break;
                 }
-                if($getData){
-                $possible_set_of_hours['possibility'][] = $free_time;
+                if($getData) {
+                    $possible_set_of_hours['possibility'][] = $free_time;
                 }
                 $free_time = [];
                 if(($service_count+1) === count($request->service_ids)){
@@ -420,7 +448,7 @@ class OnlineBookingController extends Controller
         foreach ($users as $key => $user) {
             $is_user_can_do_all_service = true;
             foreach ($services_with_related_user as $key => $related_users_data) {
-                if($related_users_data->related_users !== null){
+                if($related_users_data->related_users !== null) {
                     $related_user_ids = explode(', ', $related_users_data->related_users);
                     !in_array($user->id ,$related_user_ids) && $is_user_can_do_all_service = false;
                 }
@@ -430,6 +458,7 @@ class OnlineBookingController extends Controller
 
         return $user_data;
     }
+
     public function checkIsTimeAvailable($start_time, $duration, $eventsOnUser) {
         $end_time = $start_time->copy();
         $end_time->addMinutes($duration);
@@ -448,6 +477,56 @@ class OnlineBookingController extends Controller
         return true;
     }
 
+    public function getAvailableDates(Request $request) {
+        $settings = Settings::find(1);
+        $branch = $request->branch_id ? Branch::find($request->branch_id) : '';
+        $business_days = $branch && $branch->business_days ? $branch->business_days : $settings->business_days;
+
+        $start_date = Carbon::parse(Carbon::now()); // Start date
+        $end_date = Carbon::parse(Carbon::now()->addDays(13)); // End date
+        $activeDays = [];
+
+        foreach (CarbonPeriod::create($start_date, $end_date->subDay()) as $date) {
+            $day_name = strtolower(string: Carbon::parse($date)->format('l'));
+            $shift_day_enabled = false;
+            $user_has_shift = false;
+
+            if(isset($request->user) && $request->user > 0) {
+                $shifts = Shift::whereRaw(sql: 'start_date <= "'.$date->format('Y-m-d').'" and 
+                    end_date >= "'.$date->format('Y-m-d').'" and
+                    user_id = "'.$request->user.'"')->get();
+
+                foreach ($shifts as $shift) {
+                    $user_has_shift = true;
+                    $shift_week_data = json_decode($shift->shift_data);
+                    
+                    foreach ($shift_week_data as $key => $shift_week) {
+                        if($key == $day_name && $shift_week->enabled == true) {
+                            $shift_day_enabled = true;
+                        }
+                    }
+                    
+                    $activeDays[] = [
+                        'date' => $date->format('Y-m-d'),
+                        'enabled' => $shift_day_enabled
+                    ]; 
+                }
+            }
+            
+            if(!$user_has_shift) { 
+                $day_index = strtolower(Carbon::parse($date)->weekday());
+                if(strpos($business_days, $day_index) !== false)
+                    $shift_day_enabled = true;
+
+                $activeDays[] = [
+                    'date' => $date->format('Y-m-d'),
+                    'enabled' => $shift_day_enabled
+                ]; 
+            }
+        }
+
+        return $activeDays;
+    }
     public function checkMembership(Request $request) {
         $coupon_id = $request->coupon_id;
         $coupon_code = CouponCode::where('code', $request->code)->where('coupon_id', $coupon_id)->first();

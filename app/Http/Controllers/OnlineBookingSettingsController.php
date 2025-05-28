@@ -7,7 +7,9 @@ use App\Models\Settings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class OnlineBookingSettingsController extends Controller
 {
@@ -17,31 +19,18 @@ class OnlineBookingSettingsController extends Controller
         $settings_arr = $booking_settings->attributesToArray();
 
         $path = env("APP_URL") . '/'.env("APP_PUBLIC_STORAGE");
-        $image_names = json_decode($booking_settings->image);
-        $image = [];
-        if($image_names) {
-            foreach ($image_names as $key => $image_name) {
-                $image[] = [
-                    'name' => $image_name,
-                    'path' => $image_name,
-                    'preview' => $path . '/' . $image_name,
-                ];
-            }
-        }
-        else {
-            $image[] = [
-                'name' => $booking_settings->image,
-                'path' => $booking_settings->image,
-                'preview' => $path . '/' . $booking_settings->image,
-            ];
-        }
-        
+        $image = [
+            'name' => $booking_settings->image,
+            'path' => $booking_settings->image,
+            'preview' => $path . '/' . $booking_settings->image,
+        ];
+
         $formatted_data = [
             ...$settings_arr,
             'choose_user' => $booking_settings->choose_user == 1 ? true : false,
             'choose_qpay' => $booking_settings->choose_qpay == 1 ? true : false,
             'choose_autoDiscard' =>$booking_settings->choose_autoDiscard == 1 ? true : false,
-            'image' => $booking_settings->image ? $image : [],
+            'image' => $booking_settings->image ? [$image] : [],
             'image_url' => $booking_settings->image ? $path . '/' . $booking_settings->image : '',
         ];
 
@@ -70,8 +59,8 @@ class OnlineBookingSettingsController extends Controller
         $booking_settings->save();
 
         if ($request->file) {
-            $image_names = $this->base64ToFile($request->file);
-            $booking_settings->image = json_encode($image_names);
+            $image_name = $this->base64ToFile($request->file);
+            $booking_settings->image = $image_name;
             $booking_settings->save();
         }
 
@@ -83,20 +72,16 @@ class OnlineBookingSettingsController extends Controller
         return response($response);
     }
 
-    public function base64ToFile($encoded_files)
+    public function base64ToFile($encoded_file)
     {
-        $file_names = [];
-        foreach ($encoded_files as $key => $encoded_file) {
-            $image_64 = $encoded_file;
-            $extension = explode('/', explode(':', substr($image_64, 0, strpos($image_64, ';')))[1])[1];
-            $replace = substr($image_64, 0, strpos($image_64, ',') + 1);
-            $image = str_replace($replace, '', $image_64);
-            $image = str_replace(' ', '+', $image);
-            $image_name = Str::random(10) . '.' . $extension;
-            Storage::disk('public')->put($image_name, base64_decode($image));
+        $image_64 = $encoded_file;
+        $extension = explode('/', explode(':', substr($image_64, 0, strpos($image_64, ';')))[1])[1];
+        $replace = substr($image_64, 0, strpos($image_64, ',') + 1);
+        $image = str_replace($replace, '', $image_64);
+        $image = str_replace(' ', '+', $image);
+        $image_name = Str::random(10) . '.' . $extension;
+        Storage::disk('public')->put($image_name, base64_decode($image));
 
-            $file_names[] = $image_name;
-        }
-        return $file_names;
+        return $image_name;
     }
 }

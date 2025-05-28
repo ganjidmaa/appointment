@@ -138,9 +138,9 @@ class ServiceExportByEventsForHospitals implements FromArray, WithHeadings, With
         foreach ($datas as $key => $data) {
             $row_end++;
             if ($data->registerno) {
-                $regno = trim($data->registerno);
-                $birthYear = intval(mb_substr($regno, 4, 2)) + 1900;
-                if ((int) mb_substr($regno, 6, 2) > 12) {
+                $regno = $data->registerno;
+                $birthYear = intval(substr($regno, 4, 2)) + 1900;
+                if ((int) substr($regno, 6, 2) > 12) {
                     $birthYear += 100;
                 }
                 $data->age = $currentYear - $birthYear;
@@ -181,7 +181,6 @@ class ServiceExportByEventsForHospitals implements FromArray, WithHeadings, With
             $col['zuwlumj'] = $data->zuwlumj;
             $columns[] = $col;
             }
-
         return $columns;
     }
     public function headings(): array

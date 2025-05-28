@@ -8,24 +8,20 @@ return new class extends Migration
 {
     /**
      * Run the migrations.
-     *
-     * @return void
      */
-    public function up()
+    public function up(): void
     {
-        Schema::table('appointments', function (Blueprint $table) {
-            $table->text('diagnosis')->nullable()->after('desc');
+        Schema::table('online_booking_settings', function (Blueprint $table) {
+            $table->string('theme_color')->nullable();
         });
     }
 
     /**
      * Reverse the migrations.
-     *
-     * @return void
      */
-    public function down()
+    public function down(): void
     {
-        Schema::table('appointments', function (Blueprint $table) {
+        Schema::table('online_booking_settings', function (Blueprint $table) {
             //
         });
     }

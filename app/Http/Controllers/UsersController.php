@@ -61,11 +61,6 @@ class UsersController extends Controller
         return response($response);
     }
 
-    public function symbolLabel() {
-        $colors = ['warning', 'primary', 'success', 'danger', 'info', 'secondary', 'dark'];
-        $index = mt_rand(0, count($colors) - 1);
-        return $colors[$index];
-    }
 
     public function updateUserFormat($user_arr, $user)
     {
@@ -81,7 +76,7 @@ class UsersController extends Controller
             ];
         }
         else {
-            $state = $this->symbolLabel();
+            $state = symbolLabel();
             $label = mb_substr($user->firstname, 0, 1);
 
             $initials['label'] = mb_strtoupper($label);
@@ -146,7 +141,12 @@ class UsersController extends Controller
                 }
             }
             else 
-                $branch_id = $request->branch_id[0]['value']; 
+                if(isset($request->branch_id[0]))
+                    $branch_id = $request->branch_id[0]['value'];
+                elseif(isset($request->branch_id['value']))
+                    $branch_id = $request->branch_id['value'];
+                else    
+                    $branch_id = '';
         }
 
         // new field should add to user model
@@ -248,7 +248,7 @@ class UsersController extends Controller
 
         $branch_id = '';
         if(isset($request->branch_id) && count($request->branch_id) > 0) {
-            if($request->role_id == 3){
+            if($request->role_id == 3) {
                 foreach ($request->branch_id as $branch) {
                     $branch_id .= $branch['value'].',';
                 }

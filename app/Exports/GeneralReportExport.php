@@ -86,14 +86,13 @@ class GeneralReportExport implements FromArray, WithHeadings, WithCustomStartCel
         $start_date = date('Y-m-d 00:00:00', strtotime($this->date_interval[0]));
         $end_date = date('Y-m-d 23:59:59', strtotime($this->date_interval[1]));
 
-        $events = Event::selectRaw('events.*, 
-                appointments.id, appointments.status, appointments.treatment_state, appointments.event_date, diagnosis, conclusion')
-            ->leftJoin('appointments', 'appointments.id', '=', 'events.appointment_id')
-            ->whereBetween('events.start_time', [$start_date, $end_date])
-            ->orderBy('appointments.event_date', 'asc')
-            ->orderBy('events.customer_id', 'asc')
-            ->orderBy('events.start_time', 'asc')
-            ->get();
+        $events = Event::select('events.*')
+        ->leftJoin('appointments', 'appointments.id', '=', 'events.appointment_id')
+        ->whereBetween('events.start_time', [$start_date, $end_date])
+        ->orderBy('appointments.event_date', 'asc')
+        ->orderBy('events.customer_id', 'asc')
+        ->orderBy('events.start_time', 'asc')
+        ->get();
 
         $data = [];
         $datas = [];
@@ -104,18 +103,12 @@ class GeneralReportExport implements FromArray, WithHeadings, WithCustomStartCel
                 // $payment = $event->service ? $event->service->price : 0;
                 $key++;
                 $data['index'] = ' '.($key).' ';
-                $data['date'] = date('Y-m-d H:i', strtotime($event->start_time));
+                $data['customer_name'] = $event->customer ? $event->customer->firstname : '';
                 $data['status'] = $event->appointment->statusName($event->appointment->status);
-                $data['treatment_state'] = $event->appointment->treatmentStateName($event->appointment->treatment_state);
-                $data['customer_name'] = $event->customer ? $event->customer->lastname. ' ' . $event->customer->firstname : '';
-                $data['customer_age'] = $event->customer ? $event->customer->age() : '';
-                $data['customer_gender'] = $event->customer ? $event->customer->gender() : '';
-                $data['customer_phone'] = $event->customer ? $event->customer->phone : '';
-                $data['customer_address'] = $event->customer && $event->customer->address ? $event->customer->addressName() : '';
-                $data['customer_email'] = $event->customer ? $event->customer->email : '';
+                $data['date'] = date('Y-m-d H:i', strtotime($event->start_time));
                 $data['username'] = $event->user ? $event->user->firstname : '';
-                // $data['duration'] = $event->duration;
-                $data['service_name'] = $event->appointment->diagnosis;
+                $data['duration'] = $event->duration;
+                $data['service_name'] = $event->service ? $event->service->name : '';
                 $this->has_service_type ? $data['service_code'] = $event->service ? $event->service->code : '' : null;
 
                 $invoices = Invoice::selectRaw('invoices.id, cash_amount, qpay_amount, mobile_amount,
@@ -135,15 +128,14 @@ class GeneralReportExport implements FromArray, WithHeadings, WithCustomStartCel
                     ->first();
 
                 $paid = $invoices && $invoices->total_paid ? $invoices->total_paid : 0;
-                // $data['price'] = $event->price;
+                $data['price'] = $event->price;
                 $data['payment'] = $invoices ? $invoices->total_payment : 0;
                 $data['discount'] = $invoices ? $invoices->discount_amount : 0;
                 $data['total_paid'] = $paid;
 
                 //songoson tolboriin helberuud deh data haruulna
                 foreach($this->payment_methods as $payment_method) {
-                    // $method_amount = $invoices[$payment_method->slug.'_amount'];
-                    $method_amount = $invoices->{$payment_method->slug.'_amount'};
+                    $method_amount = $invoices[$payment_method->slug.'_amount'];
                     $data['total_'.$payment_method->slug] = $method_amount ? $method_amount : 0;
                 }
                 $data['total_left'] = $invoices ? ($invoices->total_payment - $invoices->discount_amount - $paid) : 0;
@@ -167,9 +159,9 @@ class GeneralReportExport implements FromArray, WithHeadings, WithCustomStartCel
         //songoson tolboriin helberuudiig haruulna
         $method_names = $this->payment_methods->pluck('name')->toArray();
         if($this->has_service_type)
-            return [' № ', 'Огноо', 'Төлөв', 'Үзлэгийн тов', 'Эмчлүүлэгчийн овог, нэр', 'Нас', 'Хүйс', 'Утас', 'Хаяг', 'Имэйл', 'Эмч', 'Онош', 'Эмчилгээний код', 'Төлбөр', 'Хөнгөлөлт', 'Нийт төлсөн - Үүнээс: ', ...$method_names, 'Үлдэгдэл'];
+            return [' № ', 'Эмчлүүлэгч', 'Төлөв', 'Огноо', 'Эмч', 'Хугацаа', 'Онош', 'Эмчилгээний код', 'Нэгж төлбөр', 'Төлбөр', 'Хөнгөлөлт', 'Нийт төлсөн - Үүнээс: ', ...$method_names, 'Үлдэгдэл'];
         else
-            return [' № ', 'Огноо', 'Төлөв', 'Үзлэгийн тов', 'Эмчлүүлэгчийн овог, нэр', 'Нас', 'Хүйс', 'Утас', 'Хаяг', 'Имэйл', 'Эмч', 'Онош', 'Төлбөр', 'Хөнгөлөлт', 'Нийт төлсөн - Үүнээс: ', ...$method_names, 'Үлдэгдэл'];
+            return [' № ', 'Эмчлүүлэгч', 'Төлөв', 'Огноо', 'Эмч', 'Хугацаа', 'Онош', 'Нэгж төлбөр', 'Төлбөр', 'Хөнгөлөлт', 'Нийт төлсөн - Үүнээс: ', ...$method_names, 'Үлдэгдэл'];
     }
 
     public function startCell(): string

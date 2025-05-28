@@ -30,7 +30,7 @@ class Kernel extends ConsoleKernel
         }
         if($settings->sms_send ==  1){
             if($settings->daily_sms_reminder_minutes > 0)
-                $schedule->command('daily:sendsms')->cron('* * * * *');
+                $schedule->command('daily:sendsms')->cron('* * * * *')->withoutOverlapping();
 
             if($settings->monthly_sms_reminder_months > 0)
                 $schedule->command('monthly:sendsms')->dailyAt('2:00');

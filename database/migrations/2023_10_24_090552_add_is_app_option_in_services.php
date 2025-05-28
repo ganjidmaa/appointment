@@ -14,7 +14,7 @@ return new class extends Migration
     public function up()
     {
         Schema::table('services', function (Blueprint $table) {
-            $table->boolean('is_app_option')->after('is_category')->default(false);
+            $table->boolean('is_app_option')->after('is_category')->default(true);
         });
     }
 

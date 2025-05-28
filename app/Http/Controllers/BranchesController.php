@@ -18,7 +18,7 @@ class BranchesController extends Controller
             $where = 'name like "%'.$search.'%" or phone like "%'.$search.'%" ';
         }
 
-        $branches = Branch::selectRaw('branches.id, branches.name, 
+        $branches = Branch::selectRaw('branches.id, branches.name, lunch_start_time, lunch_end_time,
                 branches.start_time, branches.end_time, branches.slot_duration, branches.phone, branches.business_days')
             ->whereRaw($where)
             ->paginate($request->items_per_page)->withQueryString();
@@ -42,6 +42,8 @@ class BranchesController extends Controller
         $branch->name = $request->name;
         $branch->start_time = $request->start_time;
         $branch->end_time = $request->end_time;
+        $branch->lunch_start_time = $request->lunch_start_time;
+        $branch->lunch_end_time = $request->lunch_end_time;
         $branch->slot_duration = $request->slot_duration;
         $branch->phone = $request->phone;
         $branch->address = $request->address;
@@ -77,6 +79,8 @@ class BranchesController extends Controller
         $branch->name = $request->name;
         $branch->start_time = $request->start_time;
         $branch->end_time = $request->end_time;
+        $branch->lunch_start_time = $request->lunch_start_time;
+        $branch->lunch_end_time = $request->lunch_end_time;
         $branch->slot_duration = $request->slot_duration;
         $branch->phone = $request->phone;
         $branch->address = $request->address;

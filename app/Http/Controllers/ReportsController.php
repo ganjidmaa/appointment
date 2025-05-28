@@ -462,7 +462,6 @@ class ReportsController extends Controller
         $sms_histories = $sms_histories_query->paginate($request->items_per_page)->withQueryString();
         $success_count = $sms_histories_query->where('status', 1)->count();
         $failed_count = $sms_count - $success_count;
-
         $data = [];
         $datas = [];
         foreach($sms_histories as $sms_history) {
@@ -484,6 +483,7 @@ class ReportsController extends Controller
         ];
         $settings = Settings::find(1);
         $sms_left = $settings->sms_limit - $settings->sms_count;
+
         $master_data['sms_history'] = $datas;
         $master_data['sms_left'] = $sms_left;
         $master_data['sms_count'] = $sms_count;

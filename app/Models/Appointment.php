@@ -59,19 +59,6 @@ class Appointment extends Model
         return $status_name;
     }
 
-    public function treatmentStateName($status_prop)
-    {
-        $status_name = '';
-        foreach(config('global.treatment_states') as $status) {
-            foreach($status['value'] as $value) {
-                if($value == $status_prop)
-                    $status_name = $status['name']; 
-            }
-        }
-
-        return $status_name;
-    }
-
     public function qpay_invoices()
     {
         return $this->hasMany(QpayInvoice::class);

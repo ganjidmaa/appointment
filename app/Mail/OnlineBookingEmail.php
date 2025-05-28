@@ -46,10 +46,10 @@ class OnlineBookingEmail extends Mailable
         $doctor = $this->converCyrToLat($user->firstname);
         $hospital = $this->converCyrToLat($settings->company_name);
         
-        // $app_date = date('m/d', strtotime($this->appointment->appointment_start_time));
-        // $app_time = date('H:i', strtotime($this->appointment->appointment_start_time));
-        $app_date = Carbon::parse($this->appointment->to_date)->format('Y-m-d');
-        $app_time = Carbon::parse($this->appointment->to_date)->format('H:i');
+        $app_date = date('m/d', strtotime($this->appointment->appointment_start_time));
+        $app_time = date('H:i', strtotime($this->appointment->appointment_start_time));
+        // $app_date = Carbon::parse($appointment->to_date)->format('Y-m-d');
+        // $app_time = Carbon::parse($appointment->to_date)->format('H:i:s');
         
         $msg = str_replace('$customer', $customer_name, $email_info);
         $msg = str_replace('$doctor', $doctor, $msg);
