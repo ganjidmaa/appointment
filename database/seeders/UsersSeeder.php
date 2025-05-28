@@ -26,11 +26,11 @@ class UsersSeeder extends Seeder
         ]);
         
         DB::table('users')->insert([
-            'email'             => 'beautician@gmail.com',
+            'email'             => 'doctor@gmail.com',
             'password'          => Hash::make('123456'),
             'email_verified_at' => now(),
             'lastname'          => '.',
-            'firstname'         => 'Гоо сайханч',
+            'firstname'         => 'Эмч',
             'registerno'        => 'АА99999999',
             'phone'             => '99999999',
             'status'            => 'active',

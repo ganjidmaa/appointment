@@ -42,21 +42,21 @@ class OnlineBookingEmail extends Mailable
         $email_info = $settings->online_booking_email_info;
         $customer = Customer::find($this->appointment->customer_id);
         $customer_name = converCyrToLat($customer->firstname);
-        $company = converCyrToLat($settings->company_name);
-
-        $events = $this->appointment->events;
-        $app_date = date('Y-m-d', strtotime($events[0]->start_time));
-        $app_time = date('H:i', strtotime($events[0]->start_time));
+        $user = User::find($this->appointment->user_id);
+        $doctor = $this->converCyrToLat($user->firstname);
+        $hospital = $this->converCyrToLat($settings->company_name);
         
-        // $app_date = Carbon::parse($events[0]->start_time)->format('Y-m-d');
-        // $app_time = Carbon::parse($events[0]->start_time)->format('H:i');
+        // $app_date = date('m/d', strtotime($this->appointment->appointment_start_time));
+        // $app_time = date('H:i', strtotime($this->appointment->appointment_start_time));
+        $app_date = Carbon::parse($this->appointment->to_date)->format('Y-m-d');
+        $app_time = Carbon::parse($this->appointment->to_date)->format('H:i');
         
         $msg = str_replace('$customer', $customer_name, $email_info);
-        // $msg = str_replace('$user', $user, $msg);
-        $msg = str_replace('$company', $company, $msg);
+        $msg = str_replace('$doctor', $doctor, $msg);
+        $msg = str_replace('$hospital', $hospital, $msg);
         $msg = str_replace('$date', $app_date, $msg);
         $msg = str_replace('$time', $app_time, $msg);
-        $msg = str_replace('$tel', $settings->telno, $msg);
+        $msg = str_replace('$tel', $settings->phone, $msg);
         $msg = str_replace('$branch', $this->appointment->branch->name, $msg);
 
         return new Content(

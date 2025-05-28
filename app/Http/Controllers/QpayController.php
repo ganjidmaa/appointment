@@ -46,13 +46,6 @@ class QpayController extends Controller
         ]);
 
         $settings = Settings::find(1);
-        $branch = Branch::find($request->branch_id);
-        $mcc_code = $settings->has_branch && $branch && $branch->use_qpay ? $branch->mcc_code : $settings->mcc_code;
-        $bank_code = $settings->has_branch && $branch && $branch->use_qpay ? $branch->bank_code : $settings->bank_code;
-        $account_number = $settings->has_branch && $branch && $branch->use_qpay ? $branch->account_number : $settings->account_number;
-        $account_holder = $settings->has_branch && $branch && $branch->use_qpay ? $branch->account_holder : $settings->account_holder;
-        $qpay_merchant_id = $settings->has_branch && $branch && $branch->use_qpay ? $branch->qpay_merchant_id : $settings->qpay_merchant_id;
-
         if ($settings->use_qpay == 0) {
             return response()->json(null);
         }
@@ -60,11 +53,10 @@ class QpayController extends Controller
         $qpay_invoice->amount = $request->amount;
         $qpay_invoice->desc = $request->desc;
         $qpay_invoice->appointment_id = $request->appointment_id;
-        $qpay_invoice->branch = $settings->has_branch && $branch && $branch->use_qpay ? $request->branch_id : 0;
         $qpay_invoice->save();
 
         $send_data = [
-            "merchant_id" => $qpay_merchant_id,
+            "merchant_id" => $settings->qpay_merchant_id,
             // "branch_code" => $request->branch_name,
             "amount" => (int) $request->amount,
             "currency" => "MNT",
@@ -72,12 +64,12 @@ class QpayController extends Controller
             "customer_logo" => "",
             "callback_url" => env('APP_URL') . '/api/qpay/hook/' . $qpay_invoice->id,
             "description" => $request->desc,
-            "mcc_code" => $mcc_code,
+            "mcc_code" => $settings->mcc_code,
             "bank_accounts" => [
                 [
-                    "account_bank_code" => $bank_code,
-                    "account_number" => $account_number,
-                    "account_name" => $account_holder,
+                    "account_bank_code" => $settings->bank_code,
+                    "account_number" => $settings->account_number,
+                    "account_name" => $settings->account_holder,
                     "is_default" => true
                 ]
             ]
@@ -97,7 +89,6 @@ class QpayController extends Controller
         $return_data = [
             'qr_image' => $result->qr_image,
             'invoice_id' => $result->id,
-            'qPay_deeplink' => $result->urls,
         ];
         return $return_data;
     }
@@ -124,7 +115,6 @@ class QpayController extends Controller
         Log::info($response->getBody());
         if ($result->invoice_status == 'PAID') {
             $email = '';
-            $is_dispatch = false;
             if ($qpay_invoice->is_success == 0) {
                 $success = false;
                 try {
@@ -174,7 +164,6 @@ class QpayController extends Controller
         $appointment = $qpay_invoice->appointment;
         if (isset($result->invoice_status) && $result->invoice_status == 'PAID') {
             $email = '';
-            $is_dispatch = false;
             if ($qpay_invoice->is_success == 0) {
                 $success = false;
                 try {
@@ -327,5 +316,12 @@ class QpayController extends Controller
         }
 
         return response($response);
+    }
+
+
+    public function testCheck() {
+        $appointment = Appointment::find(77);
+        $email = 'doganjaa@gmail.com';
+        $email && Mail::to($email)->send(new OnlineBookingEmail($appointment->id));
     }
 }

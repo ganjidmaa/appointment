@@ -22,9 +22,9 @@ class SettingsSeeder extends Seeder
             'end_time'              => '18:00',
             'slot_duration'         => '30',
             'limit_date_usage'      => now(),
-            'monthly_sms_reminder_txt'  => 'Sain baina uu, $customer tanii dawtan ireltiin uzlegiin tsag $date -iin uduriin $time tsagaas tul ta tsagtaa ireerei. $company, Utas:$tel',
-            'daily_sms_reminder_txt'    => 'Erhem uilchluulegch $customer ta $company -t $date $time tsag avsan baina. Manai saloniig songon uichluuldegt bayrlalaa. $tel',
-            'online_booking_sms_text'   => 'Erhem uilchluulegch $customer tanii $company -t $date $time -nii tsag amjilttai batalgaajilaa. Manai saloniig songon uichluuldegt bayrlalaa. $tel'
+            'monthly_sms_reminder_txt'  => 'Sain baina uu, $customer tanii dawtan ireltiin uzlegiin tsag $date -iin uduriin $time tsagaas tul ta tsagtaa ireerei. $hospital, Utas:$tel',
+            'daily_sms_reminder_txt'    => 'Erhem uilchluulegch $customer ta $hospital -t $date $time tsag avsan baina. Manai emnelgiig songon uichluuldegt bayrlalaa. $tel',
+            'online_booking_sms_text'   => 'Erhem uilchluulegch $customer tanii $company -t $date $time tsag amjilttai batalgaajilaa. Manai saloniig songon uichluuldegt bayrlalaa. $tel'
         ]);
     }
 }

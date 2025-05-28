@@ -13,12 +13,11 @@ use App\Models\Settings;
 use App\Models\ServiceBranch;
 use App\Models\ServiceUser;
 use App\Models\OnlineBookingSettings;
-use App\Models\Shift;
 use App\Models\Comment;
 use App\Models\Coupon;
 use App\Models\CouponCode;
 use Illuminate\Support\Facades\Storage;
-use Carbon\CarbonPeriod;
+use App\Models\MembershipType;
 use DateInterval;
 use DateTime;
 use Exception;
@@ -32,98 +31,76 @@ class OnlineBookingController extends Controller
 {
     public function getMasterData()
     {
-        $settings = Settings::find(1);
-        $bookingSettings = OnlineBookingSettings::find(1);
-
-        // Initialize data arrays
         $users = [];
         $services = [];
-        $branches = $settings->has_branch ? Branch::all() : [];
-        $types = $settings->has_service_type ? ServiceType::all() : [];
-
-        // Fetch Service Categories & Related Services
-        if (!$settings->has_branch) {
-            $serviceCategories = Service::select('id', 'name')
-                ->where('is_category', 1)
-                ->where('is_app_option', 1)
-                ->orderByRaw('CASE WHEN category_id = 0 THEN id ELSE category_id END ASC')
+        $types = [];
+        $settings = Settings::find(1);
+        $branches = [];
+        $comments = [];
+        $filtered_services = [];
+        $coupons_response = [];
+        //if settings has branch services and users will be fetched later
+        if ($settings->has_branch == 1) {
+            $branches = Branch::all();
+        }else{
+            $service_categories = Service::select('id', 'name')
+                ->whereRaw('is_category = 1')
+                ->orderByRaw('CASE WHEN category_id=0 THEN services.id ELSE category_id END asc')
                 ->get();
-
-            $services = $serviceCategories->map(function ($category) {
-                return [
-                    'id' => $category->id,
-                    'name' => $category->name,
-                    'services' => Service::where('category_id', $category->id)
-                        ->where('is_app_option', 1)
-                        ->get()
+            foreach ($service_categories as $service_category) {
+                $service_data = Service::whereRaw('category_id = ' . $service_category->id)->where('is_app_option', 1)->get();
+                $service = [
+                    'id' => $service_category->id,
+                    'name' => $service_category->name,
+                    'services' => $service_data,
                 ];
-            });
-
-            // Fetch Active Users for Online Booking
+                $services[] = $service;
+            }
             $users = User::select('users.id as value', 'firstname as label', 'users.id', 'firstname', 'roles.name as role_name')
-                ->leftJoin('roles', 'roles.id', '=', 'users.role_id')
-                ->where([
-                    ['status', '=', 'active'],
-                    ['show_in_online_booking', '=', 1],
-                    ['roles.name', '=', 'user']
-                ])
+                ->leftJoin('roles', 'roles.id', 'users.role_id')
+                ->where('show_in_online_booking', 1)
+                ->where('status', 'active')
+                ->where('roles.name', 'user')
                 ->get();
         }
-
-        // Fetch Popular Services with Branch Info
-        $popularServices = Service::where([
-                ['is_category', '=', 0],
-                ['is_popular', '=', 1],
-                ['is_app_option', '=', 1]
-            ])->get();
-
-        if(count($popularServices) == 0) {
-            $popularServices = Service::where([
-                ['is_category', '=', 0],
-                ['is_app_option', '=', 1]
-            ])->limit(3)->get();
+        if ($settings->has_service_type == 1){
+            $types = ServiceType::all();
+        }
+        // online booking settings array making
+        $booking_settings = OnlineBookingSettings::find(1);
+        $settings_arr = $booking_settings->attributesToArray();
+        $path = env("APP_URL") . '/'.env("APP_PUBLIC_STORAGE");
+        $image_names = json_decode($booking_settings->image);
+        $image = [];
+        if($image_names) {
+            foreach ($image_names as $key => $image_name) {
+                $image[] = $path . '/' . $image_name;
+            }
+        }
+        else {
+            $image[] = $path . '/' . $booking_settings->image;
         }
 
-        $filtered_services = $popularServices->map(function ($service) {            
-                if (!$service->available_all_branch) {
-                    $branchIds = $service->branches->pluck('branch_id');
-                    $branches = Branch::whereIn('id', $branchIds)->get();
-                } else 
-                    $branches = Branch::all();
-                
-                return [
-                    'id' => $service->id,
-                    'name' => $service->name,
-                    'price' => $service->price,
-                    'duration' => $service->duration,
-                    'branch_names' => $branches ?? [],
-                ];
-            });
-
-        // Format Online Booking Settings
-        $imagePath = env("APP_URL") . '/' . env("APP_PUBLIC_STORAGE");
-        $imageNames = json_decode($bookingSettings->image, true) ?? [];
-        $imageUrls = is_array($imageNames) ? array_map(fn($img) => "$imagePath/$img", $imageNames) : ["$imagePath/{$bookingSettings->image}"];
-
-        $formattedBookingSettings = array_merge($bookingSettings->attributesToArray(), [
-            'group_booking' => (bool) $bookingSettings->group_booking,
-            'choose_qpay' => (bool) $bookingSettings->choose_qpay,
-            'choose_autoDiscard' => (bool) $bookingSettings->choose_autoDiscard,
-            'choose_user' => (bool) $bookingSettings->choose_user,
-            'image_url' => $imageUrls,
-        ]);
-
-        // Fetch Branches with Service Types (if both branch & type settings are enabled)
-        if ($settings->has_branch || $settings->has_service_type) {
-            $branchesWithTypes = DB::table('services')
-                ->leftJoin('service_branches', 'service_branches.service_id', '=', 'services.id')
-                ->leftJoin('branches', 'branches.id', '=', 'service_branches.branch_id')
-                ->select('branches.id', DB::raw("GROUP_CONCAT(DISTINCT services.type SEPARATOR ',') AS types"))
-                ->groupBy('branches.id')
-                ->pluck('types', 'id');
-
-            foreach ($branches as $branch) {
-                $branch->types = $branchesWithTypes[$branch->id] ?? '';
+        $formatted_data = [
+            ...$settings_arr,
+            'choose_qpay' => $booking_settings->choose_qpay == 1 ? true : false,
+            'choose_autoDiscard' =>$booking_settings->choose_autoDiscard == 1 ? true : false,
+            'choose_user' => $booking_settings->choose_user == 1 ? true : false,
+            'image_url' => $booking_settings->image ? $image : '',
+        ];
+        //if type and branch present same time
+        if ($settings->has_service_type == 1 || $settings->has_branch == 1){
+            $branches_type = DB::select(DB::raw('SELECT branches.id, GROUP_CONCAT(DISTINCT services.type SEPARATOR ",") AS types FROM services
+                left join service_branches on service_branches.service_id = services.id
+                left join branches on branches.id = service_branches.branch_id
+                GROUP BY branches.id;
+                ')->getValue(DB::connection()->getQueryGrammar()));
+            foreach ($branches as $key => $branch) {
+                foreach ($branches_type as $key => $branch_type) {
+                    if($branch_type->id === null || $branch_type->id === $branch->id){
+                        $branch->types .= $branch_type->types;
+                    }
+                }
             }
         }
 
@@ -134,20 +111,19 @@ class OnlineBookingController extends Controller
             $coupon_arr = $coupon->attributesToArray();
             $coupons_response[] = [...$coupon_arr, 'image' => env("APP_URL") . '/' . env("APP_PUBLIC_STORAGE") . '/user_images/' . $coupon->image];
         }
-        $comments = Comment::orderBy('created_at', 'desc')->limit(5)->get();
+        // $comments = Comment::orderBy('created_at', 'desc')->limit(5)->get();
 
         return response([
             'branches' => $branches,
             'users' => $users,
             'serviceCategories' => $services,
-            'bookingSettings' => $formattedBookingSettings,
+            'bookingSettings' => $formatted_data,
             'types' => $types,
             'popularServices' => $filtered_services,
             'comments' => $comments,
             'memberships' => $coupons_response
         ]);
     }
-
 
     public function onlineBooking(Request $request)
     {
@@ -176,18 +152,20 @@ class OnlineBookingController extends Controller
                 $status = 202;
                 goto end;
             }
-            
-            $customer = Customer::where('phone', $request->customer['phone'])->first();
+
+            $customer = Customer::where('registerno', $request->customer['registerno'])->first();
             if(!$customer) {
-                $customer = new Customer();
-                $customer->firstname = $request->customer['firstname'];
-                $customer->lastname = $request->customer['lastname'] ?? '';
-                $customer->email = $request->customer['email'] ?? '';
-                $customer->registerno = in_array('registerno', $request->customer) ? $request->customer['registerno'] : '';
-                $customer->phone = $request->customer['phone'];
-                $customer->desc = in_array('desc', $request->customer) ? $request->customer['desc'] : '';
-                $customer->type = 'online';
-                $customer->save();
+                $customer = Customer::where('phone', $request->customer['phone'])->first();
+                if(!$customer) {
+                    $customer = new Customer();
+                    $customer->firstname = $request->customer['firstname'];
+                    $customer->lastname = $request->customer['lastname'];
+                    $customer->registerno = $request->customer['registerno'];
+                    $customer->phone = $request->customer['phone'];
+                    $customer->desc = in_array('desc', $request->customer) ? $request->customer['desc'] : '';
+                    $customer->type = 'online';
+                    $customer->save();
+                }
             }
             else {
                 $customer->firstname = $request->customer['firstname'];
@@ -260,33 +238,27 @@ class OnlineBookingController extends Controller
 
     public function getAvailableHours(Request $request, $getData = false)
     {
-        $settings = Settings::find(1);
-        $online_settings = OnlineBookingSettings::find(1);
         //doing setup based on branch
-
-        $settings = Settings::find(1);
-        $branch = $request->branch_id ? Branch::find($request->branch_id) : '';
-        $work_start_time = $branch && $branch->start_time ? $branch->start_time : $settings->start_time;
-        $work_end_time = $branch && $branch->end_time ? $branch->end_time : $settings->end_time;   
-        $business_days = $branch && $branch->business_days ? $branch->business_days : $settings->business_days;
-        $slot_minut = $branch && $branch->slot_duration ? $branch->slot_duration : $settings->slot_duration;
-        $whereRaw = $request->branch_id ? 'branch_id LIKE  "%'.$request->branch_id.'%"' : '1';
-
-        $start_time = Carbon::createFromFormat('H:i:s', $work_start_time . ':00');
-        $end_time = Carbon::createFromFormat('H:i:s', $work_end_time . ':00');
-
-        $lunch_start_time = $branch && $branch->lunch_start_time ? $branch->lunch_start_time : $settings->lunch_start_time;
-        $lunch_end_time = $branch && $branch->lunch_end_time ? $branch->lunch_end_time : $settings->lunch_end_time;
-        
-
+        if (isset($request->branch_id)) {
+            $branch_id = $request->branch_id;
+            $branch = Branch::find($branch_id);
+            $start_time = Carbon::createFromFormat('H:i:s', $branch->start_time . ':00');
+            $end_time = Carbon::createFromFormat('H:i:s', $branch->end_time . ':00');
+            $slot_minut = $branch->slot_duration;
+            $whereRaw = 'branch_id LIKE  "%'.$branch_id.'%"';
+        } else {
+            $settings = Settings::find(1);
+            $start_time = Carbon::createFromFormat('H:i:s', $settings->start_time . ':00');
+            $end_time = Carbon::createFromFormat('H:i:s', $settings->end_time . ':00');
+            $slot_minut = $settings->slot_duration;
+            $whereRaw = '1';
+        }
         //setting up event happen day
         $event_date = date('Y-m-d', strtotime($request->event_date));
         $start_date = Carbon::createFromFormat('Y-m-d H:i:s', $event_date . ' 00:00:01');
         $end_date = Carbon::createFromFormat('Y-m-d H:i:s', $event_date . ' 23:59:59');
         //setting up possible users
-        if($request->user && $request->user > 0){
-            $possible_users = User::where('id', $request->user)->get();
-        }else{
+        if($request->user == 0){
             $possible_users = User::selectRaw('users.id, users.lastname, users.firstname, users.phone, users.email')
             ->leftJoin('roles', 'roles.id', 'users.role_id')
             ->where('show_in_online_booking', 1)
@@ -294,6 +266,8 @@ class OnlineBookingController extends Controller
             ->where('roles.name', '=', 'user')
             ->whereRaw($whereRaw)
             ->get();
+        }else{
+            $possible_users = User::where('id', $request->user)->get();
         }
         // to remove hours that will exceed company working hour lets subtract company end time by sum of duration
         $sum_duration = Service::whereIn('id', $request->service_ids)->sum('duration');
@@ -320,8 +294,6 @@ class OnlineBookingController extends Controller
         foreach ($possible_hours as $possible_hour) {
             //before going to next possible hour set new flag and duration
             $possible_set_of_hours['head_time'] = $possible_hour->format('H:i');
-            // Log::info('---possible_set_of_hours', $possible_set_of_hours);
-
             $isPossibleHourAvailable = false;
             // $currentDuration = 0;
             foreach ($request->service_ids as $service_count => $service_id) {
@@ -351,68 +323,24 @@ class OnlineBookingController extends Controller
                 //using users that will do that service check is that user can do that time
                 foreach ($users_will_do_that_service as $key => $ongoing_user) {
                     $booked_hours_by_user = DB::table('events')
-                    ->selectRaw('DATE_FORMAT(events.start_time,"%H:%i") as start_time, DATE_FORMAT(events.end_time,"%H:%i") as end_time, appointments.status as appointment_status')
-                    ->leftJoin('appointments', 'appointments.id', '=', 'events.appointment_id')
+                    ->selectRaw('DATE_FORMAT(events.start_time,"%H:%i") as start_time, DATE_FORMAT(events.end_time,"%H:%i") as end_time')
                     ->whereBetween('events.start_time', [$start_date, $end_date])
-                    ->where('events.deleted_at', null)
+                    ->where('deleted_at', null)
                     ->where('events.user_id', $ongoing_user->id)
                     ->get()->toArray();
                     $booked_hours_by_user = json_decode(json_encode($booked_hours_by_user), true);
-                    // Log::info('booked_hours_by_user', $booked_hours_by_user);
-                    //------------------start of shift times------------------
-                        //make lunch time to event
-                    if($lunch_start_time && $lunch_end_time){
-                        $booked_hours_by_user[] = [
-                            'start_time' => $lunch_start_time,
-                            'end_time' => $lunch_end_time
-                        ];
-                    }
-
-                    $shifts = Shift::whereRaw(sql: 'start_date <= "'.$start_date->format('Y-m-d').'" and 
-                        end_date >= "'.$start_date->format('Y-m-d').'" and
-                        user_id = "'.$ongoing_user->id.'"')->get();
-
-                    $day_name = strtolower(string: Carbon::parse($event_date)->format('l'));
-                    foreach ($shifts as $shift) {
-                        $shift_week_data = json_decode($shift->shift_data);
-                        foreach ($shift_week_data as $key => $shift_week) {
-                            if($key == $day_name) {
-                                if($shift_week->enabled == true) {
-                                    //make custom working time to event
-                                    $booked_hours_by_user[] = ['start_time' => '00:00', 'end_time' => $shift_week->start];
-                                    $booked_hours_by_user[] = ['start_time' => $shift_week->end, 'end_time' => '23:59'];
-                                } else {
-                                    $booked_hours_by_user[] = ['start_time' => '00:00', 'end_time' => '23:59'];
-                                }
-                            }
-                            
-                        }
-                    }
-                    //------------------end of shift times------------------
-
-                    $event_count = $this->checkIsTimeAvailable($possible_hour, $service->duration, $booked_hours_by_user);
-                    // Log::info('event_count');
-                    // Log::info($event_count);
-
-                    if($event_count == 0){
+                    if($this->checkIsTimeAvailable($possible_hour, $service->duration, $booked_hours_by_user)){
                         $free_time['possible_users'][] = $ongoing_user->id; 
                     }
-                    else {
-                        if($online_settings->group_booking && $event_count < $online_settings->group_booking_limit) {
-                            $free_time['possible_users'][] = $ongoing_user->id; 
-                        }
-                    }
                 }
-                // Log::info('free_time');
-                // Log::info($free_time);
                 if(count($free_time['possible_users']) > 0){
                      $possible_hour->addMinutes($service->duration); 
-                } else {
+                }else{
                     $possible_set_of_hours = [];
                     break;
                 }
-                if($getData) {
-                    $possible_set_of_hours['possibility'][] = $free_time;
+                if($getData){
+                $possible_set_of_hours['possibility'][] = $free_time;
                 }
                 $free_time = [];
                 if(($service_count+1) === count($request->service_ids)){
@@ -436,7 +364,7 @@ class OnlineBookingController extends Controller
 
         $service_categories_data = [];
         foreach ($service_categories as $service_category) {
-            $services = Service::whereRaw('category_id = ' . $service_category->id. ' and is_app_option = 1')->get();
+            $services = Service::whereRaw('category_id = ' . $service_category->id)->where('is_app_option', 1)->get();
             $service_arr = [];
 
             foreach ($services as $key => $service) {
@@ -492,7 +420,7 @@ class OnlineBookingController extends Controller
         foreach ($users as $key => $user) {
             $is_user_can_do_all_service = true;
             foreach ($services_with_related_user as $key => $related_users_data) {
-                if($related_users_data->related_users !== null) {
+                if($related_users_data->related_users !== null){
                     $related_user_ids = explode(', ', $related_users_data->related_users);
                     !in_array($user->id ,$related_user_ids) && $is_user_can_do_all_service = false;
                 }
@@ -502,16 +430,11 @@ class OnlineBookingController extends Controller
 
         return $user_data;
     }
-
     public function checkIsTimeAvailable($start_time, $duration, $eventsOnUser) {
         $end_time = $start_time->copy();
         $end_time->addMinutes($duration);
         $end_time = $end_time->format('H:i');
         $start_time = $start_time->format('H:i');
-        $booked_time_count = 0;
-        $online_settings = OnlineBookingSettings::find(1);
-
-
         foreach ($eventsOnUser as $event) {
             if (
             ($event['start_time'] < $start_time && $start_time < $event['end_time'])||
@@ -519,67 +442,10 @@ class OnlineBookingController extends Controller
             ($event['start_time'] == $start_time && $end_time == $event['end_time'])||
             ($event['start_time'] >= $start_time && $end_time >= $event['end_time'])
             ) {
-                // Check if this event is from a time_block appointment
-                if (isset($event['appointment_status']) && $event['appointment_status'] == 'time_block') {
-                    // Increase booked_time_count by 100 times for time_block appointments
-                    $booked_time_count += 100;
-                } else {
-                    $booked_time_count++;
-                }
+                return false;
             }
         }
-        return $booked_time_count;
-    }
-
-    public function getAvailableDates(Request $request) {
-        $settings = Settings::find(1);
-        $branch = $request->branch_id ? Branch::find($request->branch_id) : '';
-        $business_days = $branch && $branch->business_days ? $branch->business_days : $settings->business_days;
-
-        $start_date = Carbon::parse(Carbon::now()); // Start date
-        $end_date = Carbon::parse(Carbon::now()->addDays(13)); // End date
-        $activeDays = [];
-
-        foreach (CarbonPeriod::create($start_date, $end_date->subDay()) as $date) {
-            $day_name = strtolower(string: Carbon::parse($date)->format('l'));
-            $shift_day_enabled = false;
-            $user_has_shift = false;
-
-            if(isset($request->user) && $request->user > 0) {
-                $shifts = Shift::whereRaw(sql: 'start_date <= "'.$date->format('Y-m-d').'" and 
-                    end_date >= "'.$date->format('Y-m-d').'" and
-                    user_id = "'.$request->user.'"')->get();
-
-                foreach ($shifts as $shift) {
-                    $user_has_shift = true;
-                    $shift_week_data = json_decode($shift->shift_data);
-                    
-                    foreach ($shift_week_data as $key => $shift_week) {
-                        if($key == $day_name && $shift_week->enabled == true) {
-                            $shift_day_enabled = true;
-                        }
-                    }
-                    
-                    $activeDays[] = [
-                        'date' => $date->format('Y-m-d'),
-                        'enabled' => $shift_day_enabled
-                    ]; 
-                }
-            }
-            
-            if(!$user_has_shift) { 
-                $day_index = strtolower(Carbon::parse($date)->weekday());
-                if(strpos($business_days, $day_index) !== false)
-                    $shift_day_enabled = true;
-
-                $activeDays[] = [
-                    'date' => $date->format('Y-m-d'),
-                    'enabled' => $shift_day_enabled
-                ]; 
-            }
-        }
-
-        return $activeDays;
+        return true;
     }
 
     public function checkMembership(Request $request) {

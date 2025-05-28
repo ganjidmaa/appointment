@@ -104,8 +104,6 @@ class SettingsController extends Controller
         $settings->phone = $request->settings['phone'];
         $settings->start_time = $request->settings['start_time'];
         $settings->end_time = $request->settings['end_time'];
-        $settings->lunch_start_time = $request->settings['lunch_start_time'];
-        $settings->lunch_end_time = $request->settings['lunch_end_time'];
         $settings->slot_duration = $request->settings['slot_duration'] ? $request->settings['slot_duration'] : '30';
         $settings->limit_date_usage = $request->settings['limit_date_usage'];
         $settings->has_branch = $request->settings['has_branch'];

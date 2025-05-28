@@ -128,20 +128,9 @@ class CouponsController extends Controller
         }
 
         $coupon->selected_services = $data;
-        $coupon_arr = $coupon->attributesToArray();
-        $path = env("APP_URL") . '/'.env("APP_PUBLIC_STORAGE").'/user_images/';
-        $image = [
-            'name' => $coupon->image,
-            'path' => $coupon->image,
-            'preview' => $path . '' . $coupon->image,
-        ];
-        $coupons_response = [
-            ...$coupon_arr,
-            'image' => [$image],
-        ];
         $status = 200;
 
-        $responce['data'] = $coupons_response;
+        $responce['data'] = $coupon;
         $responce['payload'] = ['status' => $status];
 
         return response($responce);

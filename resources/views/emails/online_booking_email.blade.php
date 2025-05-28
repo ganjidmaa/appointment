@@ -66,7 +66,7 @@
         <table>
             <thead>
                 <tr style="background-color: #f1f1f1;">
-                    <th>Үйлчилгээ</th>
+                    <th>Үзлэг, оношилгоо</th>
                     <th>Цаг</th>
                     <th>Хугацаа</th>
                 </tr>

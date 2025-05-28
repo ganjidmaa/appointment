@@ -31,7 +31,7 @@ class ServicesController extends Controller
 
         $services_response = [];
         $services = DB::table('services')
-            ->selectRaw('services.id, services.category_id, services.is_category, services.price, services.name, services.code, services.is_popular, 
+            ->selectRaw('services.id, services.category_id, services.is_category, services.price, services.name, services.code,
                 services.desc, services.status, services.type, services.duration, services.allow_resources, services.is_app_option, 
                 service_types.name as type_name')
             ->leftJoin('service_types', 'service_types.id', 'services.type')
@@ -93,13 +93,12 @@ class ServicesController extends Controller
 
         $formatted_data = [
             ...$datas,
-            'allow_resources' => $service->allow_resources === 1,
+            'allow_resources' => $service->allow_resources == 1 ? true : false,
             'checked_resources' => $checked_resources,
-            'available_all_user' => $service->available_all_user === 1,
+            'available_all_user' => $service->available_all_user == 1 ? true : false,
             'checked_users' => $checked_users,
-            'available_all_branch' => $service->available_all_branch === 1,
-            'is_app_option' => $service->is_app_option === 1,
-            'is_popular' => $service->is_popular === 1,
+            'available_all_branch' => $service->available_all_branch == 1 ? true : false,
+            'is_app_option' => $service->is_app_option == 1 ? true : false,
             'checked_branches' => $checked_branches
         ];
 
@@ -116,44 +115,42 @@ class ServicesController extends Controller
         $service->desc = $request->desc;
         $service->duration = $request->duration;
         $service->type = $request->type;
-        
         if($request->category_id != null){
-            $service->category_id = $request->category_id;
-            $service->code = $request->code;
-            $service->allow_resources = $request->allow_resources;
-            $service->available_all_user = $request->available_all_user;
-            $service->available_all_branch = $request->available_all_branch;
-            $service->is_app_option = $request->is_app_option;
-            $service->is_popular = $request->is_popular ?? 0;
-            $service->save();
+        $service->category_id = $request->category_id;
+        $service->code = $request->code;
+        $service->allow_resources = $request->allow_resources;
+        $service->available_all_user = $request->available_all_user;
+        $service->available_all_branch = $request->available_all_branch;
+        $service->is_app_option = $request->is_app_option;
+        $service->save();
 
-            if ($service->allow_resources) {
-                foreach ($request->checked_resources as $resource) {
-                    ServiceResource::create([
-                        'service_id' => $service->id,
-                        'resource_id' => (int)$resource,
-                    ]);
-                }
+        if ($service->allow_resources) {
+            foreach ($request->checked_resources as $resource) {
+                ServiceResource::create([
+                    'service_id' => $service->id,
+                    'resource_id' => (int)$resource,
+                ]);
             }
+        }
 
-            if(!$service->available_all_user) {
-                foreach($request->checked_users as $user) {
-                    ServiceUser::create([
-                        'service_id' => $service->id,
-                        'user_id' => (int)$user
-                    ]);
-                }
+        if(!$service->available_all_user) {
+            foreach($request->checked_users as $user) {
+                ServiceUser::create([
+                    'service_id' => $service->id,
+                    'user_id' => (int)$user
+                ]);
             }
+        }
 
-            if($settings->has_branch && !$service->available_all_branch) {
-                foreach($request->checked_branches as $branch) {
-                    ServiceBranch::create([
-                        'service_id' => $service->id,
-                        'branch_id' => (int)$branch
-                    ]);
-                }
+        if($settings->has_branch && !$service->available_all_branch) {
+            foreach($request->checked_branches as $branch) {
+                ServiceBranch::create([
+                    'service_id' => $service->id,
+                    'branch_id' => (int)$branch
+                ]);
             }
-        } else {
+        }
+        }else{
             $app_option_category_id = Service::where('is_app_option', 1)->where('is_category', 1)->first()->id;
             $service->category_id = $app_option_category_id;
             $service->allow_resources = false;
@@ -222,7 +219,6 @@ class ServicesController extends Controller
         $service->available_all_user = $request->available_all_user;
         $service->available_all_branch = $request->available_all_branch;
         $service->is_app_option = $request->is_app_option;
-        $service->is_popular = $request->is_popular ?? 0;
         $service->save();
 
         $settings = Settings::find(1);

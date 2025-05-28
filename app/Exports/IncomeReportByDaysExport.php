@@ -121,10 +121,11 @@ class IncomeReportByDaysExport implements FromArray, WithHeadings, WithCustomSta
             $data['total_payment'] = $invoice->total_payment ? $invoice->total_payment : 0;
             $data['total_discount'] = $invoice->total_discount ? $invoice->total_discount : 0;
             $data['total_paid'] = $invoice->total_paid ? $invoice->total_paid : 0;
-            // foreach($this->payment_methods as $payment_method) {
-            //     $method_amount = $invoice['total_'.$payment_method->slug.'_amount'];
-            //     $data['total_'.$payment_method->slug] = $method_amount ? $method_amount : 0;
-            // }
+            foreach($this->payment_methods as $payment_method) {
+                // $method_amount = $invoice['total_'.$payment_method->slug.'_amount'];
+                $method_amount = $invoice->{'total_'.$payment_method->slug.'_amount'};
+                $data['total_'.$payment_method->slug] = $method_amount ? $method_amount : 0;
+            }
             $total_left = ($invoice->total_payment - $invoice->total_discount - $invoice->total_paid);
             $data['total_left'] = $invoice->total_payment ? $total_left : 0;
 
@@ -138,7 +139,7 @@ class IncomeReportByDaysExport implements FromArray, WithHeadings, WithCustomSta
     public function headings(): array
     {
         $method_names = $this->payment_methods->pluck('name')->toArray();
-        return [' № ', ' Огноо ', 'Захиалгын тоо', 'Үйлчилгээний тоо', 'Төлбөр', 'Хөнгөлөлт', 'Нийт төлсөн - Үүнээс: ', ...$method_names, 'Үлдэгдэл'];
+        return [' № ', ' Огноо ', 'Захиалгын тоо', 'Эмчилгээний тоо', 'Төлбөр', 'Хөнгөлөлт', 'Нийт төлсөн - Үүнээс: ', ...$method_names, 'Үлдэгдэл'];
     }
 
     public function startCell(): string

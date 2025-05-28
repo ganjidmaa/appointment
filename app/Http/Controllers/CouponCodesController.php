@@ -60,12 +60,12 @@ class CouponCodesController extends Controller
 
         foreach($coupons as $coupon) {
             $count = CouponCode::where('coupon_id', $coupon->id)->count();
-            $coupon_services = 'Бүх үйлчилгээ';
+            $coupon_services = 'Бүх эмчилгээ';
             if($coupon->is_all_services == 0) { 
                 $count_services = CouponService::select('service_id')
                     ->where('coupon_id', $coupon->id)
                     ->count();
-                $coupon_services = $count_services.' үйлчилгээ ';
+                $coupon_services = $count_services.' эмчилгээ ';
             }
             
             $coupon_arr = $coupon->attributesToArray();

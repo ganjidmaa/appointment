@@ -22,25 +22,18 @@ class CustomerPolicy
         return in_array($user->role->name, ['accountant', 'reception', 'user']);
     }
 
-    public function viewPublic(User $user)
-    {
-        return in_array($user->role->name, ['accountant']);
-    }
-
     public function create(User $user)
     {
-        return in_array($user->role->name, ['reception']);
+        return in_array($user->role->name, ['reception', 'user']);
     }
 
     public function update(User $user)
     {
-        return in_array($user->role->name, ['reception']);
+        return in_array($user->role->name, ['reception', 'user']);
     }
 
     public function delete(User $user)
     {
         return in_array($user->role->name, []);
     }
-
-   
 }

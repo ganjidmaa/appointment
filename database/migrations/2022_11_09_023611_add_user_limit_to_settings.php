@@ -14,7 +14,7 @@ return new class extends Migration
     public function up()
     {
         Schema::table('settings', function (Blueprint $table) {
-            $table->smallInteger('user_limit')->after('limit_date_usage')->default(3);
+            $table->smallInteger('user_limit')->after('limit_date_usage')->default(0);
         });
     }
 

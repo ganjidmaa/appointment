@@ -12,8 +12,8 @@ use App\Models\Customer;
 use App\Models\Settings;
 use App\Models\SmsHistory;
 use App\Models\User;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 
 class OnlineBookingSms implements ShouldQueue
@@ -32,7 +32,7 @@ class OnlineBookingSms implements ShouldQueue
      */
     public function handle(): void
     {
-        Log::info('online booking sms');
+        // Log::info('online booking sms');
         $settings = Settings::find(1);
         $msg = '';
 
@@ -47,7 +47,7 @@ class OnlineBookingSms implements ShouldQueue
                 ->where('appointments.validated', 1)->where('appointments.id', $this->appointment_id)
                 ->first();
 
-            if($online_booking_sms_text != '') {
+            if($online_booking_sms_text > 0) {
                 $customer = Customer::find($appointment->customer_id);
                 $customer_name = converCyrToLat($customer->firstname);
                 // $user = User::find($appointment->event->user_id);

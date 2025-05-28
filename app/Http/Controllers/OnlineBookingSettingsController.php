@@ -7,6 +7,7 @@ use App\Models\Settings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Log;
 
 class OnlineBookingSettingsController extends Controller
 {
@@ -34,13 +35,12 @@ class OnlineBookingSettingsController extends Controller
                 'preview' => $path . '/' . $booking_settings->image,
             ];
         }
-
+        
         $formatted_data = [
             ...$settings_arr,
-            'choose_user' => $booking_settings->choose_user === 1,
-            'choose_qpay' => $booking_settings->choose_qpay === 1,
-            'group_booking' => $booking_settings->group_booking === 1,
-            'choose_autoDiscard' =>$booking_settings->choose_autoDiscard === 1,
+            'choose_user' => $booking_settings->choose_user == 1 ? true : false,
+            'choose_qpay' => $booking_settings->choose_qpay == 1 ? true : false,
+            'choose_autoDiscard' =>$booking_settings->choose_autoDiscard == 1 ? true : false,
             'image' => $booking_settings->image ? $image : [],
             'image_url' => $booking_settings->image ? $path . '/' . $booking_settings->image : '',
         ];
@@ -67,15 +67,10 @@ class OnlineBookingSettingsController extends Controller
         $booking_settings->about = $request->about;
         $booking_settings->important_info = $request->important_info;
         $booking_settings->location = $request->location;
-        $booking_settings->group_booking = $request->group_booking;
-        $booking_settings->group_booking_limit = $request->group_booking_limit;
-        $booking_settings->theme_color = $request->theme_color;
-        $booking_settings->theme_selection = $request->theme_selection;
         $booking_settings->save();
 
         if ($request->file) {
             $image_names = $this->base64ToFile($request->file);
-            // $booking_settings->image = $image_name;
             $booking_settings->image = json_encode($image_names);
             $booking_settings->save();
         }

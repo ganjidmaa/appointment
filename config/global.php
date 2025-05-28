@@ -16,6 +16,11 @@ return [
         ['value' => ['cancelled'], 'name' => 'Цуцалсан'],
         ['value' => ['completed','part_paid','unpaid'], 'name' => 'Дууссан'],
     ],
+    'treatment_states' => [
+        ['value' => [0], 'name' => 'Хүлээлгэд орсон'],
+        ['value' => [1], 'name' => 'Зөвлөгөө өгсөн'],
+        ['value' => [2], 'name' => 'Мэс засал товлосон'],
+    ],
     'numberFormat' => '#,##'
     
 ];

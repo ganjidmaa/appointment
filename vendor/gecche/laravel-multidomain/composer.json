@@ -1,0 +1,53 @@
+{
+    "name": "gecche/laravel-multidomain",
+    "description": "Laravel App on a subdomains, multi-tenancy setting",
+    "keywords": ["laravel", "subdomains", "multitenancy", "multi-tenants", "multidomain"],
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Giacomo Terreni",
+            "email": "giacomo.terreni@gmail.com"
+        }
+    ],
+    "require": {
+        "laravel/framework": "^10.0"
+    },
+    "require-dev": {
+        "mockery/mockery": "^1.5.1",
+        "phpunit/phpunit": "^9.6.0 || ^10.0.7",
+        "orchestra/testbench": "^8.0",
+        "orchestra/testbench-browser-kit": "^8.0",
+        "diablomedia/phpunit-pretty-printer": "^5.0"
+    },
+    "autoload": {
+        "classmap": [
+
+        ],
+        "psr-4": {
+            "Gecche\\Multidomain\\": "src/"
+        },
+        "files": [
+            "src/Foundation/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Gecche\\Multidomain\\Tests\\": "tests/src"
+        }
+    },
+    "scripts": {
+        "test": "phpunit"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Gecche\\Multidomain\\Foundation\\Providers\\DomainConsoleServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "kylekatarnls/update-helper": true
+        }
+    }
+}

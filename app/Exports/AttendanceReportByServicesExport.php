@@ -42,7 +42,7 @@ class AttendanceReportByServicesExport implements FromArray, WithHeadings, WithC
                 $sheet->mergeCells("B1:D1");
                 $sheet->mergeCells("E1:G1");
                 $sheet->setCellValue("B1", $this->date_interval[0].' - '. $this->date_interval[1]);
-                $sheet->setCellValue("E1", 'Үйлчилгээний захиалгын тоо');
+                $sheet->setCellValue("E1", 'Эмчилгээний тоо');
 
                 $styleArray = [
                     "borders" => [
@@ -100,9 +100,9 @@ class AttendanceReportByServicesExport implements FromArray, WithHeadings, WithC
     public function headings(): array
     {
         if($this->has_service_type)
-            return [' № ', 'Ангилал', 'Үйлчилгээ', 'Код', 'Үйлчилгээний тоо', 'Нэгжийн үнэ'];
+            return [' № ','Ангилал','Онош','Код', 'Эмчилгээний тоо', 'Нэгжийн үнэ'];
         else 
-            return [' № ', 'Ангилал', 'Үйлчилгээ', 'Үйлчилгээний тоо', 'Нэгжийн үнэ'];
+            return [' № ','Ангилал', 'Онош','Эмчилгээний тоо', 'Нэгжийн үнэ'];
     }
 
     public function startCell(): string

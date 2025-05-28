@@ -163,6 +163,7 @@ return [
         Illuminate\Translation\TranslationServiceProvider::class,
         Illuminate\Validation\ValidationServiceProvider::class,
         Illuminate\View\ViewServiceProvider::class,
+        ZanySoft\LaravelPDF\PdfServiceProvider::class,
 
         /*
          * Package Service Providers...
@@ -193,6 +194,7 @@ return [
     'aliases' => Facade::defaultAliases()->merge([
         'Mail' => Illuminate\Support\Facades\Mail::class,
         'Excel' => Maatwebsite\Excel\Facades\Excel::class,
+        'PDF' => ZanySoft\LaravelPDF\Facades\PDF::class
     ])->toArray(),
 
 ];

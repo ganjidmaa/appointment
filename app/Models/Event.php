@@ -35,6 +35,7 @@ class Event extends Model
     {
         return $this->belongsTo(Resource::class)->withTrashed();
     }
+    
     protected static function booted(): void
     {
         static::saved(function (Event $event) {

@@ -3,15 +3,18 @@
 namespace App\Http\Controllers;
 
 use App\Models\Appointment;
+use App\Models\HealthCondition;
 use App\Models\Invoice;
 use App\Models\Event;
 use App\Models\Customer;
 use App\Models\Resource;
 use App\Models\Service;
+use App\Models\ServiceMethods;
 use App\Models\ServiceType;
+use App\Models\ServiceUser;
 use App\Models\User;
 use App\Models\Payment;
-use App\Models\Shift;
+use App\Models\Coupon;
 use App\Models\CouponCode;
 use App\Models\CouponService;
 use App\Models\Settings;
@@ -19,15 +22,16 @@ use App\Models\Branch;
 use App\Models\BankAccount;
 use App\Models\PaymentMethod;
 use App\Models\InvoiceDiscount;
+use App\Models\OnlineBookingSettings;
 use App\Mail\NewAppointmentBooked;
+use Illuminate\Support\Facades\Storage;
+use DateTime;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Date;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Facades\Gate;
+use Illuminate\Validation\ValidationException;
+use ZanySoft\LaravelPDF\PDF;
 
 class AppointmentsController extends Controller
 {
@@ -35,33 +39,33 @@ class AppointmentsController extends Controller
     public function index(Request $request)
     {
         $settings = Settings::find(1);
+        $condition = $settings->has_branch ? 'users.branch_id = ' . $request->branch_id : '1';
         $condition_1 = '1=1';
-        $condition_2 = '1';
-        
-        if($request->type && $request->res_id > 0) {
-            if($request->type === 'user') {
-                if(Gate::allows('onlyAppointmentsUserSelf', User::class)) {
-                    $condition_1 = 'events.user_id = '.$request->user()->id;
-                    $condition_2 = 'users.id = '.$request->user()->id;
-                }
-                else {
-                    $condition_1 = 'events.user_id = '.$request->res_id;
-                    $condition_2 = 'users.id = '.$request->res_id;
-                }
-            }
-            elseif($request->type === 'resource')
-                $condition_1 = 'resource_id = '.$request->res_id;
+
+        if ($request->type && $request->res_id > 0) {
+            if ($request->type === 'user')
+                $condition_1 = 'events.user_id = ' . $request->res_id;
+            elseif ($request->type === 'resource')
+                $condition_1 = 'resource_id = ' . $request->res_id;
         }
 
         $events = Event::select('*', 'events.id as event_id', 'appointments.id as appointment_id', 'events.user_id as event_user_id', 'appointments.branch_id as event_branch_id')
             ->whereBetween('start_time', [$request->startDate, $request->endDate])
             ->leftJoin('users', 'users.id', 'events.user_id')
-            ->leftJoin('appointments','appointments.id','=','events.appointment_id')
+            ->leftJoin('appointments', 'appointments.id', '=', 'events.appointment_id')
             ->whereRaw($condition_1)
             ->get();
 
         $data = [];
         $datas = [];
+
+        $event_colors_old = [
+            '#665000' => 'booked',    //warning
+            '#005f94' => 'confirmed', //primary
+            '#205237' => 'showed',    //success
+            '#44228c' => 'started',   //info
+            '#912741' => 'no_show',   //danger
+        ];
 
         $text_color = '#F5F8FA';
         $text_dark_color = '#3F4254';
@@ -77,144 +81,54 @@ class AppointmentsController extends Controller
         ];
 
         foreach ($events as $event) {
-            if(!$event->appointment) continue;
             $status_name = in_array($event->appointment->status, ['part_paid', 'unpaid']) ? 'completed' : $event->appointment->status;
-            $data['id'] = $request->branch_id === $event->event_branch_id ? $event->event_id : 0;
-            $data['appointment_id'] = $request->branch_id === $event->event_branch_id ? $event->appointment_id : 0;
-            $data['title'] = $event->customer ? $event->customer->firstname : 'Ажиллахгүй цаг';
+            $data['id'] = $event->event_id;
+            $data['appointment_id'] = $event->appointment_id;
+            $data['title'] = $event->customer ? $event->customer->firstname : 'Эмчийн ажиллахгүй цаг';
             $data['cust_phone'] = $event->customer ? $event->customer->phone : '';
             $data['service_name'] = $event->service_id > 0 ? $event->service->name : '';
             $data['start'] = $event->start_time;
             $data['end'] = $event->end_time;
             $data['status'] = $status_name;
             $data['resourceId'] = $request->type === 'resource' ? $event->resource_id : $event->event_user_id;
-            $data['textColor'] = $status_name === 'booked' ? $text_dark_color : $text_color;
-            $data['color'] = array_search($status_name, $event_colors);
+            $data['textColor'] = $event->appointment->treatment_state !== 2 ? ($status_name === 'booked' ? $text_dark_color : $text_color) : $text_color;
+            $data['color'] = $event->appointment->treatment_state == 2 ? '#8e5df5' : array_search($status_name, $event_colors);
             $data['validated'] = $event->appointment->validated == 1 ? true : false;
             $data['className'] = 'fw-bolder';
             $data['editable'] = $status_name == 'completed' ? false : true;
-            $data['display'] = $request->branch_id === $event->event_branch_id ? 'normal':'background';
+            $data['display'] = $request->branch_id === $event->event_branch_id ? 'normal' : 'background';
 
             $datas[] = $data;
-        }
-
-        $settings = Settings::find(1);
-        $branch = '';
-        if ($settings->has_branch) {
-            $branch = Branch::where('id', $request->branch_id)->first();
-        }
-
-        // get lunch time
-        $lunch_start_time = $branch && $branch->lunch_start_time ? $branch->lunch_start_time : $settings->lunch_start_time;
-        $lunch_end_time = $branch && $branch->lunch_end_time ? $branch->lunch_end_time : $settings->lunch_end_time;
-        
-
-        // get shifts
-        $shifts = Shift::whereRaw(sql: '(start_date <= "'.date('Y-m-d', strtotime($request->startDate)).'" and end_date >= "'.date('Y-m-d', strtotime($request->startDate)).'")')->get();
-        $resource_shift = [];
-    
-        $users = User::select('users.id as value', 'firstname as label', 'users.id', 'firstname as title', 'roles.name as role_name', 'branch_id')
-                        ->leftJoin('roles', 'roles.id', 'users.role_id')
-                        ->where('status', 'active')
-                        ->where('roles.name', 'user')
-                        ->whereRaw($condition_2)
-                        ->get();
-
-        $day_name = strtolower(Carbon::parse($request->startDate)->format('l'));
-
-        foreach ($users as $user) { 
-            if($lunch_start_time && $lunch_end_time) { 
-                $data['id'] = 0;
-                $data['appointment_id'] = 0;
-                $data['title'] = 'Цайны цаг';
-                $data['cust_phone'] = '';
-                $data['service_name'] = '';
-                $data['start'] = Carbon::parse($request->startDate)->format('Y-m-d').' '.$lunch_start_time.':00';
-                $data['end'] = Carbon::parse($request->startDate)->format('Y-m-d').' '.$lunch_end_time.':00';
-                $data['status'] = 'booked';
-                $data['resourceId'] = $user->value;
-                $data['textColor'] = $text_color;
-                $data['color'] = array_search('booked', $event_colors);
-                $data['validated'] = false;
-                $data['className'] = 'fw-bolder';
-                $data['editable'] = true;
-                $data['display'] = 'background';
-                $data['eventAllow'] = false;
-                $datas[] = $data;
-            }
-
-            $daysOfWeek = [];
-            $start_time = $end_time = '';
-            $user_has_shift = false;
-            foreach ($shifts as $shift) {
-                if($shift->user_id == $user->value) {
-                    $user_has_shift = true;
-                    $shift_week_data = json_decode($shift->shift_data);
-                    foreach ($shift_week_data as $key => $shift_week) {
-                        if($key == $day_name && $shift_week->enabled == true) {
-                            $daysOfWeek[] = $shift_week->dayIndex;
-                            $start_time = $shift_week->start;
-                            $end_time = $shift_week->end;
-                        }
-                    }
-                    
-                    $businessHours = ['daysOfWeek' => $daysOfWeek, 'startTime' => $start_time, 'endTime' => $end_time];   
-                }
-            }
-
-            if(!$user_has_shift) { 
-                $start_time = $branch && $branch->start_time ? $branch->start_time : $settings->start_time;
-                $end_time = $branch && $branch->end_time ? $branch->end_time : $settings->end_time;   
-                $business_days = $branch && $branch->business_days ? $branch->business_days : $settings->business_days;
-
-                $day_index = strtolower(Carbon::parse($request->startDate)->weekday());
-                if(strpos($business_days, $day_index) !== false)
-                    $daysOfWeek = [$day_index];
-
-                $businessHours = ['daysOfWeek' => $daysOfWeek, 'startTime' => $start_time, 'endTime' => $end_time];
-            }
-
-            $resource_shift[] = [
-                'id' => $user->value, 
-                'title' => $user->title, 
-                'branch_id' => $user->branch_id, 
-                'role_name' => $user->role_name, 
-                'value' => $user->value, 
-                'label' => $user->label,
-                'businessHours' => $businessHours
-            ];
         }
 
         $warning = $this->systemOverdueWarning();
         $payload['message'] = $warning;
         $payload['status'] = 200;
 
-        $result['events'] = $datas;
-        $result['shifts'] = $resource_shift;
-
-        $response['data'] = $result;
+        $response['data'] = $datas;
         $response['payload'] = $payload;
 
         return response($response);
     }
 
-    public function systemOverdueWarning() {
+    public function systemOverdueWarning()
+    {
         $settings = Settings::find(1);
         $limit_date = new Carbon($settings->limit_date_usage);
         $today = Carbon::today();
         $warning_text = '';
         $interval = $limit_date->diffInDays($today);
-        
-        if($limit_date->greaterThanOrEqualTo($today) && $interval < 10) {
-            $warning_text = 'Үйлчилгээний хугацаа дуусахад '.$interval.' хоног үлдсэн байна. 7500-4000, 86086036 дугаарт холбогдож хугацаагаа сунгуулна уу.';
+
+        if ($limit_date->greaterThanOrEqualTo($today) && $interval < 10) {
+            $warning_text = 'Үйлчилгээний хугацаа дуусахад ' . $interval . ' хоног үлдсэн байна. 7500-4000, 86086036 дугаарт холбогдож хугацаагаа сунгуулна уу.';
         }
 
-        if($today->greaterThan($limit_date)) {
+        if ($today->greaterThan($limit_date)) {
             throw ValidationException::withMessages([
                 'Үйлчилгээний хугацаа хэтэрсэн байна. 7500-4000, 86086036 дугаарт холбогдож хугацаагаа сунгуулна уу.'
             ]);
         }
-        
+
         return $warning_text;
     }
 
@@ -229,34 +143,56 @@ class AppointmentsController extends Controller
     }
 
     public function getMasterData()
-    {   
-        $services = Service::selectRaw('id, id as value, CASE WHEN code != "" THEN CONCAT(name, " - ", code) ELSE name END as label, duration, allow_resources, 
-                price, category_id, type, code')
+    {
+        $services = Service::selectRaw('id, id as value, CASE WHEN code != "" THEN CONCAT(name, " - ", code) ELSE name END as label, duration, allow_resources,
+                price, category_id, type, code, available_all_user')
             ->with('resources')
             ->whereRaw('services.status = 1 and services.is_category = 0')
             ->get();
         $service_categories = Service::select('id', 'name')
             ->whereRaw('services.is_category = 1')
-            ->get();   
-        $service_types = ServiceType::select('id as value', 'name as label')->get(); 
+            ->get();
+        $service_types = ServiceType::select('id as value', 'name as label')->get();
+        $service_users = ServiceUser::select('service_id', 'user_id')->get();
+        $service_methods = ServiceMethods::select('name as label', 'content as value')->get();
         $resources = Resource::select('id as value', 'name as label', 'id', 'name as title')
             ->where('status', '=', '1')
             ->get();
         $users = User::select('users.id as value', 'firstname as label', 'users.id', 'firstname as title', 'roles.name as role_name', 'branch_id')
-                        ->leftJoin('roles', 'roles.id', 'users.role_id')
-                        ->where('status', 'active')
-                        ->where('roles.name', 'user')
-                        ->get();
+            ->leftJoin('roles', 'roles.id', 'users.role_id')
+            ->where('status', 'active')
+            ->where('roles.name', 'user')
+            ->get();
+        // $booking_settings = OnlineBookingSettings::find(1);
+        // $settings_arr = $booking_settings->attributesToArray();
 
-        $branches = Branch::select('*', 'id as value', 'name as label')->get();
+        $branches = Branch::get();
         $bank_accounts = BankAccount::select('id', 'id as value', 'name as label', 'account_number')->get();
-        
+
+        // $path = env("APP_URL") . '/storage';
+        // $image = [
+        //     'name' => $booking_settings->image,
+        //     'path' => $booking_settings->image,
+        //     'preview' => $path . '/' . $booking_settings->image,
+        // ];
+
+        // $formatted_data = [
+        //     ...$settings_arr,
+        //     'choose_user' => $booking_settings->choose_user == 1 ? true : false,
+        //     'image' => $booking_settings->image ? [$image] : [],
+        //     'image_url' => $booking_settings->image ? $path . '/' . $booking_settings->image : '',
+        // ];
+
+        // $datas['customers'] = $customers;
         $datas['services'] = $services;
+        $datas['serviceMethods'] = $service_methods;
         $datas['serviceTypes'] = $service_types;
         $datas['serviceCategories'] = $service_categories;
+        $datas['serviceUsers'] = $service_users;
         $datas['resources'] = $resources;
         $datas['users'] = $users;
         $datas['branches'] = $branches;
+        // $datas['booking_settings'] = $formatted_data;
         $datas['bankAccounts'] = $bank_accounts;
 
         return response($datas);
@@ -271,6 +207,8 @@ class AppointmentsController extends Controller
         if($request->is_time_block == false){
             $appointment->customer_id = $request->customer_id;
             $appointment->desc = $request->desc;
+            $appointment->diagnosis = $request->diagnosis;
+            $appointment->conclusion = $request->conclusion;
             if (count($item_values) == 1 && $item_values[0]['service_id'] == 0) {
                 $appointment->is_serviceless = true;
             }
@@ -288,11 +226,14 @@ class AppointmentsController extends Controller
                 $event->start_time = $request->event_date . ' ' . $item->start_time;
                 $event->end_time = $request->event_date . ' ' . $item->end_time;
                 $event->price = str_replace(',', '', $item->price);
+                $event->treatment = $item->treatment ? $item->treatment : null;
                 $event->save();
             }
         }else{
             $appointment->customer_id = 0;
             $appointment->desc = '';
+            $appointment->diagnosis = '';
+            $appointment->conclusion = '';
             $appointment->is_serviceless = true;
             $appointment->branch_id = $request->branch_id;
             $appointment->status = 'time_block';
@@ -309,17 +250,47 @@ class AppointmentsController extends Controller
                 $event->start_time = $request->event_date . ' ' . $item->start_time;
                 $event->end_time = $request->event_date . ' ' . $item->end_time;
                 $event->price = 0;
+                $event->treatment = null;
                 $event->save();
             }
         }
-        
+        if ($request->is_history == true) {
+            $appointment->status = 'completed';
+            $appointment->save();
+            $sum = 0;
+            foreach ($item_values as $item) {
+                $item = (object) $item;
+                $price = str_replace(',', '', $item->price);
+                $sum += (int) $price;
+            }
+            $invoice = new Invoice();
+            $invoice->appointment_id = $appointment->id;
+            $invoice->customer_id = $request->customer_id;
+            $invoice->user_id = $request->user()->id;
+            $invoice->payable = $sum;
+            $invoice->payment = $sum;
+            $invoice->paid = $sum;
+            $invoice->discount_amount = 0;
+            $invoice->state = 'completed';
+            $invoice->save();
+
+            $payment = new Payment();
+            $payment->invoice_id = $invoice->id;
+            $payment->user_id = $request->user()->id;
+            $payment->type = 'cash';
+            $payment->amount = $sum;
+            $payment->coupon_id = 0;
+            $payment->bank_account_id = 0;
+            $payment->save();
+        }
+
         $response['data'] = $appointment;
         $response['payload'] = [];
 
-        // TOOK TOO MUCH TIME SO LATER USE QUEUE OR SOME OTHER STUFF IN IT 
-        
+        // TOOK TOO MUCH TIME SO LATER USE QUEUE OR SOME OTHER STUFF IN IT
+
         // $settings = Settings::find(1);
-        // if ($settings->appointment_email_to_user && $appointment->status !== 'time_block')   
+        // if ($settings->appointment_email_to_user && $appointment->status !== 'time_block')
         //     $this->appointmentBookedMail($appointment);
 
         return response($response);
@@ -330,7 +301,7 @@ class AppointmentsController extends Controller
         $start_datetime = '';
         $event_parsed_datas = [];
         $event_price = 0;
-        if(!$appointment->is_serviceless) {
+        if (!$appointment->is_serviceless) {
             $events = $appointment->events;
             foreach ($events as $key => $event) {
                 $event_arr = $event->attributesToArray();
@@ -359,7 +330,10 @@ class AppointmentsController extends Controller
         $parsed_data = [
             'id' => $appointment->id,
             'status' => $appointment->status,
+            'treatment_status' => $appointment->treatment_state,
             'desc' => $appointment->desc,
+            'diagnosis' => $appointment->diagnosis,
+            'conclusion' => $appointment->conclusion,
             'customer_id' => $appointment->customer_id,
             'event_date' => date("Y-m-d", strtotime($appointment->event_date)),
             'start_datetime' => $start_datetime,
@@ -377,15 +351,15 @@ class AppointmentsController extends Controller
         $data = $this->eventParse($appointment);
 
         $customer = DB::table('customers')
-                ->selectRaw('customers.*, customers.id as value, customers.firstname as label,
+            ->selectRaw('customers.*, customers.id as value, customers.firstname as label,
                     count(appointments.id) as total_appointments,
                     count(case when appointments.status = "no_show" THEN 1 END) as no_show_appointments,
                     count(case when appointments.status = "cancelled" THEN 1 END) as cancelled_appointments'
-                )
-                ->where('customers.id', '=', $appointment->customer_id)
-                ->leftJoin('appointments', 'appointments.customer_id', '=', 'customers.id')
-                ->groupBy('customers.id')
-                ->first();
+            )
+            ->where('customers.id', '=', $appointment->customer_id)
+            ->leftJoin('appointments', 'appointments.customer_id', '=', 'customers.id')
+            ->groupBy('customers.id')
+            ->first();
 
         $response['data']['customer'] = $customer;
         $response['data']['appointment'] = $data;
@@ -399,7 +373,7 @@ class AppointmentsController extends Controller
         $event = Event::find($id);
         $request->user_id && $event->user_id = $request->user_id;
         $event->start_time = date('Y-m-d H:i:s', strtotime($request->start_time));
-        $event->end_time =  date('Y-m-d H:i:s', strtotime($request->end_time));
+        $event->end_time = date('Y-m-d H:i:s', strtotime($request->end_time));
         $event->save();
 
         $appointment = Appointment::find($event->appointment_id);
@@ -420,14 +394,13 @@ class AppointmentsController extends Controller
         $event_total_payment = 0;
 
         foreach ($items as $item) {
-            $item = (object)$item;
-            if(isset($item->id)) {
+            $item = (object) $item;
+            if (isset($item->id)) {
                 $event = Event::find($item->id);
                 $updated_event_ids[] = $item->id;
-            }
-            else 
+            } else
                 $event = new Event;
-            
+
             $request->customer_id ? $event->customer_id = $request->customer_id : null;
             $item->user_id ? $event->user_id = $item->user_id : null;
             $event->resource_id = $item->allow_resources == 1 ? $item->resource_id : 0;
@@ -436,24 +409,27 @@ class AppointmentsController extends Controller
             $event->start_time = $request->event_date . ' ' . $item->start_time;
             $event->end_time = $request->event_date . ' ' . $item->end_time;
             $event->appointment_id = $request->appointment_id;
+            $item->treatment ? $event->treatment = $item->treatment : null;
             $event->price = str_replace(',', '', $item->price);
             $event->save();
 
             $event_total_payment += $event->price;
         }
 
-        foreach($old_events as $old_event) {
-            if(!in_array($old_event->id, $updated_event_ids))
+        foreach ($old_events as $old_event) {
+            if (!in_array($old_event->id, $updated_event_ids))
                 $old_event->forcedelete();
-        } 
+        }
         $items_number = count($items);
-        
+
         $appointment = Appointment::find($request->appointment_id);
         $appointment->customer_id = $request->customer_id;
         $appointment->desc = $request->desc;
+        $appointment->diagnosis = $request->diagnosis;
+        $appointment->conclusion = $request->conclusion;
         $appointment->branch_id = $request->branch_id;
         $appointment->event_date = $request->event_date;
-        if(!($items_number == 1 && $items[0]['service_id'] == 0)) {
+        if (!($items_number == 1 && $items[0]['service_id'] == 0)) {
             $appointment->is_serviceless = false;
         }
         $appointment->save();
@@ -475,6 +451,19 @@ class AppointmentsController extends Controller
     {
         $appointment = Appointment::find($id);
         $appointment->status = $request->status;
+        $appointment->save();
+        $status = 200;
+
+        $response['data'] = $appointment;
+        $response['payload'] = ['status' => $status];
+
+        return response($response);
+    }
+
+    public function changeTreatmentStatus(Request $request, $id)
+    {
+        $appointment = Appointment::find($id);
+        $appointment->treatment_state = $request->status;
         $appointment->save();
         $status = 200;
 
@@ -517,16 +506,17 @@ class AppointmentsController extends Controller
         return $response;
     }
 
-    public function createPayment(Request $request, $id) {
+    public function createPayment(Request $request, $id)
+    {
         $appointment = Appointment::find($id);
         // $appointment->status = $request->left_payment > 0 ? 'part_paid' : 'completed';
         $appointment->status = $request->state;
         $appointment->save();
 
         $invoice = Invoice::where('appointment_id', '=', $id)
-                ->where('state', '!=', 'voided')
-                ->first();
-        if($invoice)
+            ->where('state', '!=', 'voided')
+            ->first();
+        if ($invoice)
             $invoice->paid = intval($invoice->paid) + $request->paid_amount;
         else {
             $total_discount_amount = 0;
@@ -540,7 +530,7 @@ class AppointmentsController extends Controller
             $invoice->discount_amount = $total_discount_amount;
             $invoice->save();
 
-            foreach($request->discounts as $discount) {
+            foreach ($request->discounts as $discount) {
                 $invoice_discount = new InvoiceDiscount();
                 $invoice_discount->invoice_id = $invoice->id;
                 $invoice_discount->type = $discount['type'];
@@ -557,7 +547,7 @@ class AppointmentsController extends Controller
         $invoice->state = $request->state;
         $invoice->save();
 
-        foreach($request->split_payments as $split_payment) {
+        foreach ($request->split_payments as $split_payment) {
             $split_amount = $split_payment['split_payment_amount'];
             $type = $split_payment['type'];
             if($type !== 'qpay'){
@@ -572,11 +562,11 @@ class AppointmentsController extends Controller
                 $payment->save();
             }
 
-            if($type == 'coupon') {
+            if ($type == 'coupon') {
                 $coupon_code_id = $split_payment['coupon_code_id'];
                 $coupon_code = CouponCode::find($coupon_code_id);
                 $total_redeemed = $coupon_code->redeemed + $split_amount;
-    
+
                 $coupon_code->redeemed = $total_redeemed;
                 ($total_redeemed == $coupon_code->value) ? $coupon_code->status = 'redeemed' : null;
                 $coupon_code->save();
@@ -597,18 +587,19 @@ class AppointmentsController extends Controller
         return $response;
     }
 
-    public function getPaymentDetails($id) {
+    public function getPaymentDetails($id)
+    {
         $detail_datas = [];
 
         $payments = Payment::where('invoice_id', $id)->get();
         $payment_types = PaymentMethod::all();
 
-        foreach($payments as $payment) {
+        foreach ($payments as $payment) {
             $type_name = 'Бусад';
-            foreach($payment_types as $type) {
-                if($payment->type == $type->slug) {
+            foreach ($payment_types as $type) {
+                if ($payment->type == $type->slug) {
                     $type_name = $type->name;
-                }    
+                }
             }
             $detail_datas[] = [
                 'type' => $type_name,
@@ -616,7 +607,7 @@ class AppointmentsController extends Controller
                 'payment_date' => date("Y-m-d H:m", strtotime($payment->created_at)),
                 'desc' => $payment->desc,
                 'coupon_code' => $payment->coupon_id > 0 ? $payment->couponCode->code : '',
-                'bank_account' => $payment->bank_account_id > 0 ? $payment->bankAccount->name.', '. $payment->bankAccount->account_number : '',
+                'bank_account' => $payment->bank_account_id > 0 ? $payment->bankAccount->name . ', ' . $payment->bankAccount->account_number : '',
             ];
         }
         $status = 200;
@@ -626,7 +617,8 @@ class AppointmentsController extends Controller
         return response($result);
     }
 
-    public function voidPayment($id) { 
+    public function voidPayment($id)
+    {
         $this->authorize('update', Customer::class);
         $invoice = [];
 
@@ -653,24 +645,26 @@ class AppointmentsController extends Controller
     }
 
 
-    public function getPaymentMethods() {
+    public function getPaymentMethods()
+    {
         $payment_methods = PaymentMethod::select('id', 'name', 'slug', 'active')->get();
 
-        foreach($payment_methods as $payment_method) {
+        foreach ($payment_methods as $payment_method) {
             $payment_method_arr = $payment_method->attributesToArray();
             $payment_method_arr = [
                 ...$payment_method_arr,
                 'active' => $payment_method->active == 1 ? true : false,
             ];
-            
+
             $payment_methods_data[] = $payment_method_arr;
         }
         return $payment_methods_data;
     }
 
-    public function updatePaymentMethods(Request $request) {
+    public function updatePaymentMethods(Request $request)
+    {
         $methods = $request->payment_methods;
-        foreach($methods as $method) {
+        foreach ($methods as $method) {
             $payment_method = PaymentMethod::find($method['id']);
             $payment_method->active = $method['active'];
             $payment_method->save();
@@ -684,7 +678,8 @@ class AppointmentsController extends Controller
         return response($response);
     }
 
-    public function appointmentBookedMail($appointment) {
+    public function appointmentBookedMail($appointment)
+    {
         $is_success = false;
         $settings = Settings::find(1);
         $data['event_date'] = $appointment->event_date;
@@ -695,29 +690,110 @@ class AppointmentsController extends Controller
 
         $users = [];
         $user_id = 0;
-        foreach($appointment->events as $event) {
+        foreach ($appointment->events as $event) {
             $users[$event->user->id] = $event->user->email;
         }
         $users = array_unique($users);
 
-        foreach($users as $user_id => $user_email) {
+        foreach ($users as $user_id => $user_email) {
             $data['events'] = [];
             $custom_events = $appointment->events->where('user_id', $user_id);
-            $data['event_time'] = date('H:i', strtotime($custom_events->first()->start_time)).' - '.date('H:i', strtotime($custom_events->last()->end_time));
-      
-            foreach($custom_events as $event) {
-                $event['service_name'] = $event->service ? $event->service->code ? $event->service->code .' '. $event->service->name : $event->service->name : 'Үйлчилгээ сонгогдоогүй';
-                $event['service_time'] = date('H:i', strtotime($event->start_time)).' - '.date('H:i', strtotime($event->end_time));
+
+            $data['event_time'] = date('H:i', strtotime($custom_events->first()->start_time)) . ' - ' . date('H:i', strtotime($custom_events->last()->end_time));
+
+            foreach ($custom_events as $event) {
+                $event['service_name'] = $event->service ? $event->service->code ? $event->service->code . ' ' . $event->service->name : $event->service->name : 'Үйлчилгээ сонгогдоогүй';
+                $event['service_time'] = date('H:i', strtotime($event->start_time)) . ' - ' . date('H:i', strtotime($event->end_time));
 
                 $data['events'][] = $event;
             }
 
-            if($data) {
+            if ($data) {
                 Mail::to($user_email)->send(new NewAppointmentBooked($data));
                 $is_success = true;
             }
         }
-        
+
         return $is_success;
+    }
+
+    public function getHealthCondition($id)
+    {
+        $health_condition = HealthCondition::where('appointment_id', $id)->first();
+        if ($health_condition == null) {
+            $health_condition = new HealthCondition();
+            $health_condition->appointment_id = $id;
+            $health_condition->save();
+        }
+        $health_condition_refetch = HealthCondition::where('appointment_id', $id)->first();
+        $health_condition_decoded = $this->healthConditionDecode($health_condition_refetch);
+        $result['data'] = $health_condition_decoded;
+        return $result;
+    }
+
+    public function updateHealthCondition(Request $request)
+    {
+        $health_condition = $this->healthConitionEncode($request);
+        unset($health_condition->id);
+        unset($health_condition->appointment_id);
+        $health_condition_old = HealthCondition::where('appointment_id', $request->appointment_id)->first();
+        $health_condition_old->update(get_object_vars($health_condition));
+        $result['data'] = $request->appointment_id;
+        return $result;
+    }
+
+    public function healthConditionDecode($health_condition)
+    {
+        $keyWords = ['farsightedness', 'Ph', 'with_glasses', 'nearsightedness', 'air_tonometer', 'CCT', 'go_scope', 'eye_movement', 'refraction', 'cranial_angle', 'color', 'pathological_discharge', 'tear_path', 'eye_recesses', 'eyelids', 'mucus', 'sclera', 'cornea', 'sought_camera', 'rainbow_cover', 'pupil', 'RAPD', 'crystal', 'glass', 'eye_disk', 'CDR', 'A_V', 'S_H', 'K_W', 'S_S', 'reticulated', 'yallow_dot', 'outside', 'distance_R', 'distance_L', 'near_R', 'near_L'];
+        foreach ($keyWords as $value) {
+            $health_condition->$value = json_decode($health_condition->$value);
+        }
+        return $health_condition;
+    }
+
+    public function healthConitionEncode($health_condition)
+    {
+        $keyWords = ['farsightedness', 'Ph', 'with_glasses', 'nearsightedness', 'air_tonometer', 'CCT', 'go_scope', 'eye_movement', 'refraction', 'cranial_angle', 'color', 'pathological_discharge', 'tear_path', 'eye_recesses', 'eyelids', 'mucus', 'sclera', 'cornea', 'sought_camera', 'rainbow_cover', 'pupil', 'RAPD', 'crystal', 'glass', 'eye_disk', 'CDR', 'A_V', 'S_H', 'K_W', 'S_S', 'reticulated', 'yallow_dot', 'outside', 'distance_R', 'distance_L', 'near_R', 'near_L'];
+        foreach ($keyWords as $value) {
+            $health_condition->$value = json_encode($health_condition->$value);
+        }
+        return $health_condition;
+    }
+
+    public function printHealthCondition($id)
+    {
+        $filename = 'healthCondition.pdf';
+        $health_condition_refetch = HealthCondition::where('appointment_id', $id)->first();
+        $health_condition_decoded = $this->healthConditionDecode($health_condition_refetch);
+        $events = Event::where('appointment_id', $id)->get();
+        $appointment = Appointment::find($id);
+        $customer = $appointment->customer;
+        $age = 0;
+        $currentYear = Carbon::now()->year;
+        $settings = Settings::find(1);
+        if ($customer->registerno) {
+            $regno = $customer->registerno;
+            $birthYear = intval(substr($regno, 4, 2)) + 1900;
+            if ((int) substr($regno, 6, 2) > 12) {
+                $birthYear += 100;
+            }
+            $age = $currentYear - $birthYear;
+        } else {
+            $age = '--';
+        }
+        $pdf = new PDF();
+        $pdf->shrink_tables_to_fit = 0;
+        $pdf->loadView('health_condition', [
+            'data' => $health_condition_decoded,
+            'customer' => $customer,
+            'events' => $events,
+            'appointment' => $appointment,
+            'age' => $age,
+            'settings' => $settings
+        ]);
+
+        Storage::disk('public')->put($filename, $pdf->save());
+        $response['data'] = $filename;
+        return $response;
     }
 }

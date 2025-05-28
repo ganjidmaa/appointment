@@ -2,8 +2,8 @@
 
 use App\Http\Controllers\AppointmentsController;
 use App\Http\Controllers\QpayController;
-use App\Http\Controllers\ShiftController;
 use Illuminate\Http\Request;
+use Illuminate\Routing\RouteRegistrar;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthenticationController;
 use App\Http\Controllers\CouponsController;
@@ -13,7 +13,7 @@ use App\Http\Controllers\DiscountsController;
 use App\Http\Controllers\MembershipsController;
 use App\Http\Controllers\MembershipTypesController;
 use App\Http\Controllers\UsersController;
-use App\Http\Controllers\MobileOtpController;
+use App\Http\Controllers\ProvincesController;
 use App\Http\Controllers\ResourcesController;
 use App\Http\Controllers\ServiceCategoriesController;
 use App\Http\Controllers\ServicesController;
@@ -25,14 +25,14 @@ use App\Http\Controllers\OnlineBookingSettingsController;
 use App\Http\Controllers\OnlineBookingController;
 use App\Http\Controllers\BranchesController;
 use App\Http\Controllers\BankAccountsController;
-use App\Http\Controllers\CommentController;
+use App\Http\Controllers\ServiceMethodController;
 use App\Models\Appointment;
 
 /*
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
-| 
+|
 | Here is where you can register API routes for your application. These
 | routes are loaded by the RouteServiceProvider within a group which
 | is assigned the "api" middleware group. Enjoy building your API!
@@ -69,6 +69,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('customer/get_membership_data/{id}', [CustomersController::class, 'getMembership']);
     Route::post('customer/remove_member/{id}', [CustomersController::class, 'removeMember']);
     Route::post('customer/member/add_customer', [CustomersController::class, 'addMember']);
+    Route::post('customer/images/add_image', [CustomersController::class, 'addImage']);
+    Route::get('customer/get_customer_images/{id}', [CustomersController::class, 'getImages']);
+    Route::get('customer/delete_customer_image/{id}', [CustomersController::class, 'deleteImage']);
 
     Route::get('services/query', [ServicesController::class, 'index']);
     Route::put('service', [ServicesController::class, 'store']);
@@ -76,7 +79,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('service/{id}', [ServicesController::class, 'update']);
     Route::delete('service/{id}', [ServicesController::class, 'destroy']);
 
-    Route::get('app_options/query', [ServicesController::class, 'appOptionIndex']);
+    Route::get('service_method/query', [ServiceMethodController::class, 'index']);
+    Route::get('service_method/{id}', [ServiceMethodController::class, 'getServiceMethod']);
+    Route::delete('service_method/{id}', [ServiceMethodController::class, 'deleteServiceMethod']);
+    Route::post('service_method', [ServiceMethodController::class, 'updateOrCreate']);
 
     Route::prefix('service')->group(function () {
         Route::put('category', [ServicesController::class, 'storeCategory']);
@@ -100,6 +106,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('item', [AppointmentsController::class, 'update']);
         Route::get('master_data', [AppointmentsController::class, 'getMasterData']);
         Route::post('change_status/{id}', [AppointmentsController::class, 'changeStatus']);
+        Route::post('change_treatment_status/{id}', [AppointmentsController::class, 'changeTreatmentStatus']);
         Route::post('change_desc/{id}', [AppointmentsController::class, 'changeDesc']);
         Route::post('cancel/{id}', [AppointmentsController::class, 'cancelEvent']);
         Route::post('payment/{id}', [AppointmentsController::class, 'createPayment']);
@@ -109,6 +116,9 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('payment_methods', [AppointmentsController::class, 'getPaymentMethods']);
         Route::put('update_payment_methods', [AppointmentsController::class, 'updatePaymentMethods']);
     });
+    Route::get('health_condition/{id}', [AppointmentsController::class, 'getHealthCondition']);
+    Route::post('health_condition/print/{id}', [AppointmentsController::class, 'printHealthCondition']);
+    Route::post('health_condition', [AppointmentsController::class, 'updateHealthCondition']);
 
     Route::get('discounts/query', [DiscountsController::class, 'index']);
     Route::get('discounts/master_data', [DiscountsController::class, 'getMasterData']);
@@ -172,15 +182,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('bank_account/{id}', [BankAccountsController::class, 'update']);
     Route::delete('bank_account/{id}', [BankAccountsController::class, 'destroy']);
 
-    Route::get('shift/index', [ShiftController::class, 'index']);
-    Route::put('shift/store_data', [ShiftController::class, 'store']);
-    Route::put('shift/store_time_off', [ShiftController::class, 'storeTimeOff']);
-
-    Route::get('comments/query', [CommentController::class, 'index']);
-    Route::put('comments', [CommentController::class, 'store']);
-    Route::get('comments/{id}', [CommentController::class, 'show']);
-    Route::post('comments/{id}', [CommentController::class, 'update']);
-    Route::delete('comments/{id}', [CommentController::class, 'destroy']);
 });
 
 Route::prefix('qpay')->group(function () {
@@ -213,10 +214,7 @@ Route::get('branch/{id}', [BranchesController::class, 'show']);
 Route::post('branch/{id}', [BranchesController::class, 'update']);
 Route::delete('branch/{id}', [BranchesController::class, 'destroy']);
 
-Route::post('mobile/get_code', [MobileOtpController::class, 'sendConfirmCode']);
-Route::post('mobile/confirm_code', [MobileOtpController::class, 'confirm']);
-Route::post('mobile/cancel_event', [MobileOtpController::class, 'cancelEvent']);
-
 Route::post('/send_email', [ApiController::class, 'postFromSite']);
+Route::post('/test_check', [QpayController::class, 'testCheck']);
 
 

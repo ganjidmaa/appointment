@@ -16,7 +16,8 @@
         "psr/simple-cache": "^2.0",
         "pusher/pusher-php-server": "^7.2",
         "symfony/http-client": "^6.1",
-        "symfony/mailgun-mailer": "^6.1"
+        "symfony/mailgun-mailer": "^6.1",
+        "zanysoft/laravel-pdf": "^2.0"
     },
     "require-dev": {
         "fakerphp/faker": "^1.9.1",

@@ -53,7 +53,7 @@ class AttendanceReportByRushHours implements FromArray, WithHeadings, WithCustom
                 $sheet->mergeCells("B1:D1");
                 $sheet->mergeCells("E1:G1");
                 $sheet->setCellValue("B1", $this->date_interval[0].' - '. $this->date_interval[1]);
-                $sheet->setCellValue("E1", 'Үйлчилгээний оргил цагийн ачааллын тайлан');
+                $sheet->setCellValue("E1", 'Эмчилгээний оргил цагийн ачааллын тайлан');
 
                 //branch names
                 $branches = Branch::orderBy('id', 'asc')->get();

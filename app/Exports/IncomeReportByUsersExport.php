@@ -2,8 +2,11 @@
 
 namespace App\Exports;
 
+use App\Models\Event;
+use App\Models\Invoice;
 use App\Models\Appointment;
 use Maatwebsite\Excel\Concerns\FromArray;
+use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithCustomStartCell;
 use Maatwebsite\Excel\Concerns\ShouldAutoSize;
@@ -13,6 +16,10 @@ use Maatwebsite\Excel\Concerns\WithColumnWidths;
 use Maatwebsite\Excel\Events\AfterSheet;
 use Maatwebsite\Excel\Concerns\WithEvents;
 use Maatwebsite\Excel\Concerns\WithColumnFormatting;
+use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+
+use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
 class IncomeReportByUsersExport implements FromArray, WithHeadings, WithCustomStartCell, ShouldAutoSize, WithStyles, WithColumnWidths, WithEvents, WithColumnFormatting
@@ -58,8 +65,8 @@ class IncomeReportByUsersExport implements FromArray, WithHeadings, WithCustomSt
 
     public function array(): array
     {
-        $start_date = date('Y-m-d', strtotime($this->date_interval[0]));
-        $end_date = date('Y-m-d', strtotime($this->date_interval[1]));
+        $start_date = date('Y-m-d 00:00:00', strtotime($this->date_interval[0]));
+        $end_date = date('Y-m-d 23:59:59', strtotime($this->date_interval[1]));
 
         $query_ex2 = DB::select('select  users.firstname,
                         SUM(CASE

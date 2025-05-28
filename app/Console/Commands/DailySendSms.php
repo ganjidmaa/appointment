@@ -34,7 +34,6 @@ class DailySendSms extends Command
      */
     public function handle()
     {
-        Log::info('start daily sms');
         $msg = '';
 
         $settings = Settings::find(1);
@@ -60,7 +59,7 @@ class DailySendSms extends Command
                 ->where('appointments.validated', 1)
                 ->whereRaw('TIMESTAMPDIFF(MINUTE, ?, eventss.appointment_start_time) = ?', [$today, $daily_sms_remind_minutes])
                 ->get();
-            
+
             foreach ($appointments as $appointment)
             {
                 if($settings->sms_count >= $settings->sms_limit) {
@@ -72,8 +71,8 @@ class DailySendSms extends Command
 
                 $customer_name = converCyrToLat($customer->firstname);
                 $user = User::find($appointment->user_id);
-                $user = converCyrToLat($user->firstname);
-                $company = converCyrToLat($settings->company_name);
+                $doctor = $this->converCyrToLat($user->firstname);
+                $hospital = $this->converCyrToLat($settings->company_name);
                 
                 $app_date = date('m/d', strtotime($appointment->appointment_start_time));
                 $app_time = date('H:i', strtotime($appointment->appointment_start_time));
@@ -81,8 +80,8 @@ class DailySendSms extends Command
                 // $app_time = Carbon::parse($appointment->to_date)->format('H:i:s');
                 
                 $msg = str_replace('$customer', $customer_name, $daily_sms_temp);
-                $msg = str_replace('$user', $user, $msg);
-                $msg = str_replace('$company', $company, $msg);
+                $msg = str_replace('$doctor', $doctor, $msg);
+                $msg = str_replace('$hospital', $hospital, $msg);
                 $msg = str_replace('$date', $app_date, $msg);
                 $msg = str_replace('$time', $app_time, $msg);
                 $msg = str_replace('$tel', $settings->phone, $msg);

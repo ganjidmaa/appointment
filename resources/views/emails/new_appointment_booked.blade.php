@@ -42,7 +42,7 @@
     </table>
 
     <div style="padding-top: 10px; display:block;">
-        <h3 style="font-weight: 500; margin: 0">Үйлчлүүлэгч</h4>
+        <h3 style="font-weight: 500; margin: 0">Эмчлүүлэгч</h4>
     </div>
     <table width="100%" style="border: 1px solid #ccc;">
         <tr>
@@ -64,13 +64,13 @@
     </table>
 
     <div style="padding-top: 10px; display:block;">
-        <h3 style="font-weight: 500; margin: 0">Үйлчилгээ</h4>
+        <h3 style="font-weight: 500; margin: 0">Эмчилгээ</h4>
     </div>
     <table width="100%" style="border: 1px solid #aaa;">
         @foreach($data['events'] as $event)
             <tr>
                 <td valign="top" width="25%">
-                    Үйлчилгээ:
+                    Эмчилгээ:
                 </td>
                 <td valign="top" width="40%">
                     {{ $event['service_name'] }}

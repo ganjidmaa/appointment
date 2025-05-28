@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SmsHistory;
+use App\Exports\ServiceExportByEventsForHospitals;
 use Illuminate\Http\Request;
 use App\Models\Appointment;
 use App\Models\Event;
@@ -19,7 +20,6 @@ use App\Exports\IncomeReportByDaysExport;
 use App\Exports\AttendanceReportByUsersExport;
 use App\Exports\AttendanceReportByServicesExport;
 use App\Exports\AttendanceReportByRushHours;
-use App\Exports\CustomerReportMultiSheet;
 use App\Exports\CouponCodeExport;
 use Maatwebsite\Excel\Facades\Excel;
 use Carbon\Carbon;
@@ -173,7 +173,7 @@ class ReportsController extends Controller
 
         $appointment_status_datas['colors'][] = array_search('customer_cancelled', $event_colors);
         $appointment_status_datas['numbers'][] = $appointment_statuses->customer_cancelled_events;
-        $appointment_status_datas['labels'][] = 'Үйлчлүүлэгч цуцалсан';
+        $appointment_status_datas['labels'][] = 'Эмчлүүлэгч цуцалсан';
 
         $appointment_status_datas['colors'][] = array_search('user_cancelled', $event_colors);
         $appointment_status_datas['numbers'][] = $appointment_statuses->user_cancelled_events;
@@ -264,7 +264,7 @@ class ReportsController extends Controller
     }
 
     public function generalReport(Request $request) {
-        $file_name = 'Үйлчилгээний дэлгэрэнгүй тайлан '.date('m.d', strtotime($request->start_date)) .'-'. date('m.d', strtotime($request->end_date)).'.xlsx';
+        $file_name = 'Эмчилгээний дэлгэрэнгүй тайлан.xlsx';
         $settings = Settings::find(1);
         Excel::store(new GeneralReportExport([$request->start_date, $request->end_date], $settings->has_service_type), $file_name, 'excels');
 
@@ -274,7 +274,7 @@ class ReportsController extends Controller
     }
 
     public function incomeReportByDays(Request $request) {
-        $file_name = 'Орлогын тайлан - өдрөөр '.date('m.d', strtotime($request->start_date)) .'-'. date('m.d', strtotime($request->end_date)).'.xlsx';
+        $file_name = 'Орлогын тайлан - өдрөөр.xlsx';
         Excel::store(new IncomeReportByDaysExport([$request->start_date, $request->end_date]), $file_name, 'excels');
 
         $response['data'] = ['file_name' => $file_name];
@@ -283,7 +283,7 @@ class ReportsController extends Controller
     }
 
     public function incomeReportByUsers(Request $request) {
-        $file_name = 'Орлогын тайлан - ажилтан '.date('m.d', strtotime($request->start_date)) .'-'. date('m.d', strtotime($request->end_date)).'.xlsx';
+        $file_name = 'Орлогын тайлан - эмчээр.xlsx';
         Excel::store(new IncomeReportByUsersExport([$request->start_date, $request->end_date]), $file_name, 'excels');
 
         $response['data'] = ['file_name' => $file_name];
@@ -292,7 +292,7 @@ class ReportsController extends Controller
     }
 
     public function attendanceReportByUsers(Request $request) {
-        $file_name = 'Үйлчилгээний тайлан - ажилтан '.date('m.d', strtotime($request->start_date)) .'-'. date('m.d', strtotime($request->end_date)).'.xlsx';
+        $file_name = 'Эмчилгээний тайлан - эмчээр.xlsx';
         Excel::store(new AttendanceReportByUsersExport([$request->start_date, $request->end_date]), $file_name, 'excels');
 
         $response['data'] = ['file_name' => $file_name];
@@ -301,7 +301,7 @@ class ReportsController extends Controller
     }
 
     public function attendanceReportByServices(Request $request) {
-        $file_name = 'Үйлчилгээний тайлан - үйлчилгээ '.date('m.d', strtotime($request->start_date)) .'-'. date('m.d', strtotime($request->end_date)).'.xlsx';
+        $file_name = 'Эмчилгээний тайлан - эмчилгээгээр.xlsx';
         $settings = Settings::find(1);
         Excel::store(new AttendanceReportByServicesExport([$request->start_date, $request->end_date], $settings->has_service_type), $file_name, 'excels');
 
@@ -320,7 +320,8 @@ class ReportsController extends Controller
     }
 
     public function attendanceReportByRushHours(Request $request) {
-        $file_name = 'Үйлчилгээний тайлан - оргил ачааллаар '.date('m.d', strtotime($request->start_date)) .'-'. date('m.d', strtotime($request->end_date)).'.xlsx';
+        $file_name = 'Эмчилгээний тайлан - оргил ачааллаар.xlsx';
+        $settings = Settings::find(1);
         Excel::store(new AttendanceReportByRushHours([$request->start_date, $request->end_date]), $file_name, 'excels');
 
         $response['data'] = ['file_name' => $file_name];
@@ -328,10 +329,10 @@ class ReportsController extends Controller
         return response($response);
     }
 
-    public function customerReportByFrequency(Request $request) {
-        $file_name = 'Хэрэглэгчийн тайлан - давтамжаар '.date('m.d', strtotime($request->start_date)) .'-'. date('m.d', strtotime($request->end_date)).'.xlsx';
+    public function serviceExportByEvents(Request $request) {
+        $file_name = 'Үзлэгийн болон хүлээлгийн тайлан.xlsx';
         $settings = Settings::find(1);
-        Excel::store(new CustomerReportMultiSheet([$request->start_date, $request->end_date], $settings->has_service_type, $settings->has_branch), $file_name, 'excels');
+        Excel::store(new ServiceExportByEventsForHospitals([$request->start_date, $request->end_date]), $file_name, 'excels');
 
         $response['data'] = ['file_name' => $file_name];
         $response['payload'] = ['status' => 200];
@@ -365,6 +366,10 @@ class ReportsController extends Controller
             $start_date = date('Y-m-d', strtotime($request->dates_start_date));
             $end_date = date('Y-m-d', strtotime($request->dates_end_date));
         }
+
+        $payment_methods = PaymentMethod::where('active', 1)
+                ->whereNotIn('slug', ['discount_card', 'discount', 'membership'])
+                ->orderBy('id', 'asc')->get();
 
         $appointments = Appointment::selectRaw("appointments.status, customers.firstname,events_users.user_firstnames, event_number, total_duration, start_time,
                 payment, discount_amount, paid, left_amount, event_date")
@@ -423,7 +428,6 @@ class ReportsController extends Controller
         $responce['payload'] = $payload;
         return response($responce);
     }
-
     public function smsHistory(Request $request){
         $search = $request->search;
         $where = '1 = 1';
@@ -483,8 +487,8 @@ class ReportsController extends Controller
         $master_data['sms_history'] = $datas;
         $master_data['sms_left'] = $sms_left;
         $master_data['sms_count'] = $sms_count;
-        $master_data['failed_count'] = $failed_count;
         $master_data['success_count'] = $success_count;
+        $master_data['failed_count'] = $failed_count;
 
         $responce['data'] = [$master_data];
         $responce['payload'] = $payload;

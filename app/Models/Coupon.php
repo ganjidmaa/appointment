@@ -16,5 +16,11 @@ class Coupon extends Model
         'is_all_services' => 'boolean',
     ];
 
-   
+    protected function image(): Attribute
+    {
+        return Attribute::make(
+            get: fn (string|null $value) => $value ? env("APP_URL") . '/' . env("APP_PUBLIC_STORAGE") . '/user_images/' . $value : '',
+        );
+    }
+
 }
